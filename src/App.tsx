@@ -12,6 +12,14 @@ import ComparisonSection from './components/ComparisonSection';
 import Footer from './components/Footer';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import DashboardLayout from './components/dashboard/DashboardLayout';
+import DashboardHome from './pages/dashboard/DashboardHome';
+import MonitoreoPage from './pages/dashboard/MonitoreoPage';
+import GrabacionesPage from './pages/dashboard/GrabacionesPage';
+import CamarasPage from './pages/dashboard/CamarasPage';
+import ZonasExclusionPage from './pages/dashboard/ZonasExclusionPage';
+import HistorialPage from './pages/dashboard/HistorialPage';
 
 function LandingPage() {
   return (
@@ -40,6 +48,35 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<DashboardHome />} />
+            <Route path="monitoreo" element={<MonitoreoPage />} />
+            <Route path="grabaciones" element={<GrabacionesPage />} />
+            <Route
+              path="camaras"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <CamarasPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="zonas-exclusion"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ZonasExclusionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="historial" element={<HistorialPage />} />
+          </Route>
         </Routes>
       </AuthProvider>
     </BrowserRouter>

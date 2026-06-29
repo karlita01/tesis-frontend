@@ -70,7 +70,7 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     try {
       await register({ nombre: nombre.trim(), email: email.trim(), password });
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setErrors({
         general: err instanceof Error ? err.message : 'Error al crear la cuenta.',

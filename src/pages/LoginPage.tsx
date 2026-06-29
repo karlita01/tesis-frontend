@@ -46,7 +46,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login({ email: email.trim(), password });
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setErrors({
         general: err instanceof Error ? err.message : 'Error al iniciar sesión.',
@@ -122,22 +122,6 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        {/* Nota de cuentas demo para desarrollo */}
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">
-            Cuentas de prueba (mock)
-          </p>
-          <div className="flex flex-col gap-1.5 text-xs text-slate-500">
-            <span>
-              <span className="font-medium text-slate-600">Vigilante:</span>{' '}
-              vigilante@crowdsense.ai / 123456
-            </span>
-            <span>
-              <span className="font-medium text-slate-600">Administrador:</span>{' '}
-              admin@crowdsense.ai / admin123
-            </span>
-          </div>
-        </div>
       </AuthCard>
     </AuthLayout>
   );

@@ -1,0 +1,279 @@
+import { useState, useEffect } from 'react';
+import type { CameraIP } from '../../types/api';
+import {
+  getCameras,
+  createCamera,
+  updateCameraStatus,
+  deleteCamera,
+} from '../../services/cameraService';
+
+interface FormState {
+  nombre: string;
+  direccion_ip: string;
+  ubicacion: string;
+  descripcion: string;
+  activa: boolean;
+}
+
+const EMPTY: FormState = {
+  nombre: '',
+  direccion_ip: '',
+  ubicacion: '',
+  descripcion: '',
+  activa: true,
+};
+
+export default function CamarasPage() {
+  const [cameras, setCameras] = useState<CameraIP[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<FormState>(EMPTY);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  async function load() {
+    try {
+      setLoading(true);
+      setCameras(await getCameras());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al cargar cámaras.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  function flash(msg: string) {
+    setSuccess(msg);
+    setTimeout(() => setSuccess(null), 3500);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.nombre.trim() || !form.direccion_ip.trim() || !form.ubicacion.trim()) {
+      setFormError('Nombre, dirección IP y ubicación son obligatorios.');
+      return;
+    }
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      await createCamera({
+        nombre: form.nombre.trim(),
+        direccion_ip: form.direccion_ip.trim(),
+        ubicacion: form.ubicacion.trim(),
+        descripcion: form.descripcion.trim() || undefined,
+        activa: form.activa,
+      });
+      setForm(EMPTY);
+      setShowForm(false);
+      flash('Cámara registrada correctamente.');
+      await load();
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Error al registrar cámara.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleToggle(cam: CameraIP) {
+    setTogglingId(cam.id);
+    try {
+      await updateCameraStatus(cam.id, !cam.activa);
+      flash(`Cámara ${!cam.activa ? 'activada' : 'desactivada'}.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al actualizar estado.');
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function handleDelete(cam: CameraIP) {
+    if (!confirm(`¿Eliminar la cámara "${cam.nombre}"? Esta acción no se puede deshacer.`)) return;
+    setDeletingId(cam.id);
+    try {
+      await deleteCamera(cam.id);
+      flash('Cámara eliminada.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al eliminar cámara.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0F172A]">Cámaras IP</h1>
+          <p className="text-slate-500 text-sm mt-1">RF-1.1 · Solo administrador</p>
+        </div>
+        <button
+          onClick={() => { setShowForm((v) => !v); setFormError(null); }}
+          className="px-4 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+        >
+          {showForm ? 'Cancelar' : '+ Nueva cámara'}
+        </button>
+      </div>
+
+      <div className="mb-6 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 flex gap-3">
+        <span className="text-amber-600 shrink-0 text-base" aria-hidden="true">⚠</span>
+        <p className="text-sm text-amber-800 leading-relaxed">
+          La cámara queda registrada como configuración.{' '}
+          <strong>En el prototipo no se realiza ninguna conexión real.</strong> La integración de
+          red se implementará en una fase posterior.
+        </p>
+      </div>
+
+      {success && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">
+          {success}
+        </div>
+      )}
+      {error && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 flex justify-between items-start">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="ml-4 text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
+
+      {showForm && (
+        <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="font-semibold text-[#0F172A] mb-4 text-base">Registrar nueva cámara</h2>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              { id: 'nombre', label: 'Nombre', placeholder: 'Cámara entrada principal', key: 'nombre' as const },
+              { id: 'ip', label: 'Dirección IP', placeholder: '192.168.1.100', key: 'direccion_ip' as const },
+              { id: 'ubicacion', label: 'Ubicación', placeholder: 'Planta baja — acceso norte', key: 'ubicacion' as const },
+              { id: 'descripcion', label: 'Descripción (opcional)', placeholder: 'Vista frontal del edificio', key: 'descripcion' as const },
+            ].map(({ id, label, placeholder, key }) => (
+              <div key={id} className="flex flex-col gap-1">
+                <label htmlFor={id} className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                  {label}
+                  {key !== 'descripcion' && <span className="text-red-500 ml-0.5">*</span>}
+                </label>
+                <input
+                  id={id}
+                  type="text"
+                  value={form[key]}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            ))}
+
+            <div className="sm:col-span-2 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="activa"
+                checked={form.activa}
+                onChange={(e) => setForm((f) => ({ ...f, activa: e.target.checked }))}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="activa" className="text-sm text-slate-600 select-none">
+                Activa al registrar
+              </label>
+            </div>
+
+            {formError && (
+              <div className="sm:col-span-2 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                {formError}
+              </div>
+            )}
+
+            <div className="sm:col-span-2 flex gap-3">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-5 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Registrando...' : 'Registrar cámara'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); setForm(EMPTY); setFormError(null); }}
+                className="px-5 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <p className="text-slate-400 text-sm">Cargando cámaras...</p>
+        </div>
+      ) : cameras.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <p className="text-3xl mb-3">📷</p>
+          <p className="font-medium text-slate-600 text-sm">Sin cámaras registradas</p>
+          <p className="text-slate-400 text-xs mt-1">
+            Usa el botón "Nueva cámara" para registrar la primera.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <p className="text-xs text-slate-500 font-medium">
+              {cameras.length} {cameras.length === 1 ? 'cámara registrada' : 'cámaras registradas'}
+            </p>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {cameras.map((cam) => (
+              <li key={cam.id} className="px-6 py-4 flex items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-[#0F172A] text-sm">{cam.nombre}</p>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        cam.activa
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}
+                    >
+                      {cam.activa ? 'ACTIVA' : 'INACTIVA'}
+                    </span>
+                  </div>
+                  <p className="text-xs font-mono text-slate-500 mt-0.5">{cam.direccion_ip}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{cam.ubicacion}</p>
+                  {cam.descripcion && (
+                    <p className="text-xs text-slate-400 mt-0.5 italic">{cam.descripcion}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => handleToggle(cam)}
+                    disabled={togglingId === cam.id}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      cam.activa
+                        ? 'border border-amber-200 text-amber-700 hover:bg-amber-50'
+                        : 'border border-green-200 text-green-700 hover:bg-green-50'
+                    }`}
+                  >
+                    {togglingId === cam.id ? '…' : cam.activa ? 'Desactivar' : 'Activar'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(cam)}
+                    disabled={deletingId === cam.id}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    {deletingId === cam.id ? '…' : 'Eliminar'}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
