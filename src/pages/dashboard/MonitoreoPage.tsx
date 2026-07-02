@@ -71,21 +71,19 @@ function drawScene(
     ctx.restore();
   }
 
-  // Bounding boxes de personas
+  // Bounding boxes — solo personas fuera de zonas de exclusión
   ctx.lineWidth = 2;
   ctx.font = 'bold 11px sans-serif';
   for (const b of boxes) {
-    const color = b.excluida ? '#94a3b8' : '#22d3ee';
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color + '33';
+    if (b.excluida) continue;
+    ctx.strokeStyle = '#22d3ee';
+    ctx.fillStyle = '#22d3ee33';
     const bx = b.x1 * w, by = b.y1 * h;
     const bw = (b.x2 - b.x1) * w, bh = (b.y2 - b.y1) * h;
     ctx.fillRect(bx, by, bw, bh);
     ctx.strokeRect(bx, by, bw, bh);
-    if (!b.excluida) {
-      ctx.fillStyle = color;
-      ctx.fillText(`${Math.round(b.conf * 100)}%`, bx + 2, by - 3);
-    }
+    ctx.fillStyle = '#22d3ee';
+    ctx.fillText(`${Math.round(b.conf * 100)}%`, bx + 2, by - 3);
   }
 }
 
@@ -533,14 +531,10 @@ export default function MonitoreoPage() {
                   <span className="w-3 h-3 rounded-sm border-2 border-cyan-400 inline-block" />
                   Persona detectada
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm border-2 border-slate-400 inline-block" />
-                  En zona excluida
-                </span>
                 {selectedZone && (
                   <span className="flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-sm border-2 border-dashed border-purple-500 inline-block" />
-                    Zona de exclusión
+                    Zona de exclusión (ignorada)
                   </span>
                 )}
               </div>
