@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAlerts } from '../../context/AlertContext';
+import AlertToast from '../alerts/AlertToast';
 
 interface NavItem {
   to: string;
@@ -11,6 +13,7 @@ interface NavItem {
 
 export default function DashboardLayout() {
   const { user, logout, isAdmin } = useAuth();
+  const { pendingAlerts } = useAlerts();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -19,6 +22,7 @@ export default function DashboardLayout() {
     { to: '/dashboard/monitoreo', label: 'Monitoreo', icon: '▶' },
     { to: '/dashboard/grabaciones', label: 'Grabaciones', icon: '▣' },
     { to: '/dashboard/historial', label: 'Historial', icon: '◈' },
+    { to: '/dashboard/alertas', label: 'Alertas', icon: '⚠' },
     ...(isAdmin
       ? [
           { to: '/dashboard/camaras', label: 'Cámaras IP', icon: '⊕' },
@@ -53,20 +57,29 @@ export default function DashboardLayout() {
       </div>
 
       <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={navLinkClass}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <span className="text-base w-5 text-center shrink-0" aria-hidden="true">
-              {item.icon}
-            </span>
-            {item.label}
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const isAlertas = item.to === '/dashboard/alertas';
+          const badge = isAlertas && pendingAlerts.length > 0 ? pendingAlerts.length : 0;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={navLinkClass}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <span className="text-base w-5 text-center shrink-0" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className="flex-1">{item.label}</span>
+              {badge > 0 && (
+                <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="px-3 py-4 border-t border-slate-700/60">
@@ -139,6 +152,7 @@ export default function DashboardLayout() {
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
+        <AlertToast />
       </div>
     </div>
   );

@@ -19,7 +19,8 @@ dist-ssr
 .env.*
 !.env.example
 
-# Claude local
+# Archivos de instrucciones locales (no subir al repo)
+CLAUDE.md
 .claude/
 
 # Editor directories and files

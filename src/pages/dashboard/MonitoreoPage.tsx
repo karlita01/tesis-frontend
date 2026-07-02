@@ -108,6 +108,11 @@ export default function MonitoreoPage() {
   // ── Análisis webcam ──────────────────────────────────────────────────────
   const [webcamActive, setWebcamActive] = useState(false);
   const [frameResult, setFrameResult] = useState<FrameAnalysisResult | null>(null);
+  // RF-5.4: métricas de rendimiento
+  const [latenciaMs, setLatenciaMs] = useState<number | null>(null);
+  const [fps, setFps] = useState<number | null>(null);
+  const fpsCounterRef = useRef(0);
+  const fpsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasOverlayRef = useRef<HTMLCanvasElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -186,7 +191,10 @@ export default function MonitoreoPage() {
     canvas.toBlob(async (blob) => {
       if (!blob) return;
       try {
+        const t0 = Date.now();
         const result = await analyzeFrame(currentSession.id, blob, currentZoneId);
+        setLatenciaMs(Date.now() - t0);
+        fpsCounterRef.current++;
         setFrameResult(result);
         if (overlay && video) {
           overlay.width = video.clientWidth;
@@ -245,14 +253,25 @@ export default function MonitoreoPage() {
 
   function stopWebcam() {
     if (captureIntervalRef.current) { clearInterval(captureIntervalRef.current); captureIntervalRef.current = null; }
+    if (fpsTimerRef.current) { clearInterval(fpsTimerRef.current); fpsTimerRef.current = null; }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+    fpsCounterRef.current = 0;
     setWebcamActive(false);
+    setFps(null);
+    setLatenciaMs(null);
   }
 
   function beginCapture() {
     if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
+    if (fpsTimerRef.current) clearInterval(fpsTimerRef.current);
+    fpsCounterRef.current = 0;
     // Usa el ref para que siempre llame a la versión más reciente del callback
     captureIntervalRef.current = setInterval(() => { void captureCallbackRef.current?.(); }, 500);
+    // Actualiza FPS cada segundo contando frames respondidos
+    fpsTimerRef.current = setInterval(() => {
+      setFps(fpsCounterRef.current);
+      fpsCounterRef.current = 0;
+    }, 1000);
   }
 
   // ── RAF loop para canvas sobre video de análisis ─────────────────────────
@@ -348,6 +367,7 @@ export default function MonitoreoPage() {
     setSelectedType(null); setSelectedCameraId(null); setSelectedRecordingId(null);
     setSelectedZoneId(null); setSession(null); setStep('select'); setError(null);
     setFrameResult(null); setVideoProgress(0); setVideoCurrentStats(null); setVideoFin(null);
+    setFps(null); setLatenciaMs(null);
     latestVideoDetRef.current = [];
   }
 
@@ -470,18 +490,40 @@ export default function MonitoreoPage() {
               </div>
 
               {frameResult && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <StatCard label="Grupo más grande" value={String(frameResult.personas)} accent="blue" />
-                  <div className={`rounded-xl px-4 py-3 border ${nivelStyle.bg} ${nivelStyle.border}`}>
-                    <p className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">Nivel</p>
-                    <p className={`text-sm font-bold ${nivelStyle.text}`}>{nivelStyle.label}</p>
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <StatCard label="Grupo más grande" value={String(frameResult.personas)} accent="blue" />
+                    <div className={`rounded-xl px-4 py-3 border ${nivelStyle.bg} ${nivelStyle.border}`}>
+                      <p className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">Nivel</p>
+                      <p className={`text-sm font-bold ${nivelStyle.text}`}>{nivelStyle.label}</p>
+                    </div>
+                    <StatCard label="Máx. sesión" value={String(frameResult.personas_maximas)} accent="slate" />
+                    <div className={`rounded-xl px-4 py-3 border ${frameResult.alerta_activada ? 'bg-red-100 border-red-300' : 'bg-slate-50 border-slate-200'}`}>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">Alerta</p>
+                      <p className={`text-sm font-bold ${frameResult.alerta_activada ? 'text-red-700' : 'text-slate-400'}`}>
+                        {frameResult.alerta_activada ? '⚠ ACTIVA' : 'Sin alerta'}
+                      </p>
+                    </div>
                   </div>
-                  <StatCard label="Máx. sesión" value={String(frameResult.personas_maximas)} accent="slate" />
-                  <div className={`rounded-xl px-4 py-3 border ${frameResult.alerta_activada ? 'bg-red-100 border-red-300' : 'bg-slate-50 border-slate-200'}`}>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">Alerta</p>
-                    <p className={`text-sm font-bold ${frameResult.alerta_activada ? 'text-red-700' : 'text-slate-400'}`}>
-                      {frameResult.alerta_activada ? '⚠ ACTIVA' : 'Sin alerta'}
-                    </p>
+
+                  {/* RF-5.4 — Métricas de rendimiento */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl px-4 py-3 border border-slate-200 bg-slate-50">
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">FPS analizados</p>
+                      <p className="text-sm font-bold text-[#0F172A]">
+                        {fps != null ? `${fps} fps` : '—'}
+                      </p>
+                    </div>
+                    <div className={`rounded-xl px-4 py-3 border ${
+                      latenciaMs != null && latenciaMs > 800
+                        ? 'bg-amber-50 border-amber-200'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">Latencia backend</p>
+                      <p className={`text-sm font-bold ${latenciaMs != null && latenciaMs > 800 ? 'text-amber-700' : 'text-[#0F172A]'}`}>
+                        {latenciaMs != null ? `${latenciaMs} ms` : '—'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -657,13 +699,26 @@ export default function MonitoreoPage() {
                   {(Object.keys(SOURCE_INFO) as VideoSourceType[]).map((tipo) => {
                     const info = SOURCE_INFO[tipo];
                     const active = selectedType === tipo;
+                    const disabled = tipo === 'camara_ip';
                     return (
-                      <button key={tipo} onClick={() => handleSelectType(tipo)}
-                        className={`text-left p-4 rounded-xl border-2 transition-all ${active ? 'border-[#2563EB] bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                      <button
+                        key={tipo}
+                        onClick={() => !disabled && handleSelectType(tipo)}
+                        disabled={disabled}
+                        className={`text-left p-4 rounded-xl border-2 transition-all ${
+                          disabled
+                            ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed'
+                            : active
+                              ? 'border-[#2563EB] bg-blue-50'
+                              : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
                         <span className="text-2xl mb-2 block" aria-hidden="true">{info.icon}</span>
-                        <p className={`text-sm font-semibold mb-1 ${active ? 'text-[#2563EB]' : 'text-[#0F172A]'}`}>{info.title}</p>
+                        <p className={`text-sm font-semibold mb-1 ${active ? 'text-[#2563EB]' : 'text-[#0F172A]'}`}>
+                          {info.title}
+                          {disabled && <span className="ml-2 text-[10px] font-normal text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full">No disponible</span>}
+                        </p>
                         <p className="text-xs text-slate-500 leading-relaxed">{info.description}</p>
-                        {info.note && <p className="text-[10px] text-amber-600 mt-2 font-medium">⚠ {info.note}</p>}
                       </button>
                     );
                   })}

@@ -74,6 +74,7 @@ export interface AnalysisResult {
   id: number;
   sesion_id: number;
   zona_config_id: number | null;
+  zona_nombre: string | null;
   personas_maximas: number;
   nivel_maximo: NivelAglomeracion;
   tiempo_primera_media_seg: number | null;
@@ -82,6 +83,23 @@ export interface AnalysisResult {
   inicio_analisis: string | null;
   fin_analisis: string | null;
   fecha_registro: string | null;
+  frame_evidencia: string | null;
+  tipo_dia: string | null;
+}
+
+// ── Zonas críticas EP-005 ─────────────────────────────────────────────────────
+
+export interface ZonaCritica {
+  zona_id: number;
+  zona_nombre: string;
+  total_sesiones: number;
+  sesiones_con_alerta: number;
+  max_personas: number;
+  promedio_personas: number;
+}
+
+export interface ZonasCriticasResponse {
+  zonas: ZonaCritica[];
 }
 
 export interface VideoSSEEvent {
@@ -103,4 +121,27 @@ export interface VideoSSEEvent {
   frames_procesados?: number;
   // error
   mensaje?: string;
+}
+
+// ── Alertas EP-004 ────────────────────────────────────────────────────────────
+
+export interface Alerta {
+  id: number;
+  sesion_id: number;
+  usuario_id: number | null;
+  zona_config_id: number | null;
+  nivel: 'bajo' | 'medio' | 'alto';
+  personas: number;
+  atendida: boolean;
+  fecha_alerta: string | null;
+  fecha_atencion: string | null;
+}
+
+export interface AlertaSSEEvent {
+  tipo: 'alerta';
+  id: number;
+  sesion_id: number;
+  nivel: 'alto';
+  personas: number;
+  fecha_alerta: string | null;
 }

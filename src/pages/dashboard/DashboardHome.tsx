@@ -19,6 +19,20 @@ export default function DashboardHome() {
       description: 'Sube y gestiona videos previos para usarlos en sesiones de monitoreo.',
       accent: 'border-slate-200 hover:border-slate-400 hover:shadow-slate-50',
     },
+    {
+      to: '/dashboard/historial',
+      icon: '◈',
+      title: 'Historial',
+      description: 'Consulta los resultados de análisis guardados por sesión.',
+      accent: 'border-slate-200 hover:border-slate-400 hover:shadow-slate-50',
+    },
+    {
+      to: '/dashboard/alertas',
+      icon: '⚠',
+      title: 'Alertas',
+      description: 'Revisa y atiende las notificaciones de aglomeración detectadas.',
+      accent: 'border-red-200 hover:border-red-400 hover:shadow-red-50',
+    },
     ...(isAdmin
       ? [
           {

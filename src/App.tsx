@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { AlertProvider } from './context/AlertContext';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import ProblemSection from './components/ProblemSection';
@@ -20,6 +21,7 @@ import GrabacionesPage from './pages/dashboard/GrabacionesPage';
 import CamarasPage from './pages/dashboard/CamarasPage';
 import ZonasExclusionPage from './pages/dashboard/ZonasExclusionPage';
 import HistorialPage from './pages/dashboard/HistorialPage';
+import AlertasPage from './pages/dashboard/AlertasPage';
 
 function LandingPage() {
   return (
@@ -44,40 +46,43 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<DashboardHome />} />
-            <Route path="monitoreo" element={<MonitoreoPage />} />
-            <Route path="grabaciones" element={<GrabacionesPage />} />
+        <AlertProvider>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route
-              path="camaras"
+              path="/dashboard"
               element={
-                <ProtectedRoute requireAdmin>
-                  <CamarasPage />
+                <ProtectedRoute>
+                  <DashboardLayout />
                 </ProtectedRoute>
               }
-            />
-            <Route
-              path="zonas-exclusion"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <ZonasExclusionPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="historial" element={<HistorialPage />} />
-          </Route>
-        </Routes>
+            >
+              <Route index element={<DashboardHome />} />
+              <Route path="monitoreo" element={<MonitoreoPage />} />
+              <Route path="grabaciones" element={<GrabacionesPage />} />
+              <Route
+                path="camaras"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <CamarasPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="zonas-exclusion"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <ZonasExclusionPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="historial" element={<HistorialPage />} />
+              <Route path="alertas" element={<AlertasPage />} />
+            </Route>
+          </Routes>
+        </AlertProvider>
       </AuthProvider>
     </BrowserRouter>
   );
