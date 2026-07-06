@@ -13,6 +13,11 @@ interface FormState {
   ubicacion: string;
   descripcion: string;
   activa: boolean;
+  rtsp_usuario: string;
+  rtsp_password: string;
+  rtsp_puerto: string;
+  rtsp_canal: string;
+  rtsp_subtipo: string;
 }
 
 const EMPTY: FormState = {
@@ -21,6 +26,11 @@ const EMPTY: FormState = {
   ubicacion: '',
   descripcion: '',
   activa: true,
+  rtsp_usuario: 'admin',
+  rtsp_password: '',
+  rtsp_puerto: '554',
+  rtsp_canal: '1',
+  rtsp_subtipo: '1',
 };
 
 export default function CamarasPage() {
@@ -68,6 +78,11 @@ export default function CamarasPage() {
         ubicacion: form.ubicacion.trim(),
         descripcion: form.descripcion.trim() || undefined,
         activa: form.activa,
+        rtsp_usuario: form.rtsp_usuario.trim() || 'admin',
+        rtsp_password: form.rtsp_password.trim() || undefined,
+        rtsp_puerto: parseInt(form.rtsp_puerto) || 554,
+        rtsp_canal: parseInt(form.rtsp_canal) || 1,
+        rtsp_subtipo: parseInt(form.rtsp_subtipo) || 1,
       });
       setForm(EMPTY);
       setShowForm(false);
@@ -107,6 +122,10 @@ export default function CamarasPage() {
     }
   }
 
+  function setField(key: keyof FormState, value: string | boolean) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
@@ -120,15 +139,6 @@ export default function CamarasPage() {
         >
           {showForm ? 'Cancelar' : '+ Nueva cámara'}
         </button>
-      </div>
-
-      <div className="mb-6 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 flex gap-3">
-        <span className="text-amber-600 shrink-0 text-base" aria-hidden="true">⚠</span>
-        <p className="text-sm text-amber-800 leading-relaxed">
-          La cámara queda registrada como configuración.{' '}
-          <strong>En el prototipo no se realiza ninguna conexión real.</strong> La integración de
-          red se implementará en una fase posterior.
-        </p>
       </div>
 
       {success && (
@@ -146,35 +156,111 @@ export default function CamarasPage() {
       {showForm && (
         <div className="mb-6 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <h2 className="font-semibold text-[#0F172A] mb-4 text-base">Registrar nueva cámara</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { id: 'nombre', label: 'Nombre', placeholder: 'Cámara entrada principal', key: 'nombre' as const },
-              { id: 'ip', label: 'Dirección IP', placeholder: '192.168.1.100', key: 'direccion_ip' as const },
-              { id: 'ubicacion', label: 'Ubicación', placeholder: 'Planta baja — acceso norte', key: 'ubicacion' as const },
-              { id: 'descripcion', label: 'Descripción (opcional)', placeholder: 'Vista frontal del edificio', key: 'descripcion' as const },
-            ].map(({ id, label, placeholder, key }) => (
-              <div key={id} className="flex flex-col gap-1">
-                <label htmlFor={id} className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  {label}
-                  {key !== 'descripcion' && <span className="text-red-500 ml-0.5">*</span>}
-                </label>
-                <input
-                  id={id}
-                  type="text"
-                  value={form[key]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            ))}
+          <form onSubmit={handleSubmit} className="space-y-4">
 
-            <div className="sm:col-span-2 flex items-center gap-2">
+            {/* Datos generales */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {([
+                { id: 'nombre', label: 'Nombre', placeholder: 'Cámara entrada principal', key: 'nombre', required: true },
+                { id: 'ip', label: 'Dirección IP', placeholder: '192.168.1.100', key: 'direccion_ip', required: true },
+                { id: 'ubicacion', label: 'Ubicación', placeholder: 'Planta baja — acceso norte', key: 'ubicacion', required: true },
+                { id: 'descripcion', label: 'Descripción (opcional)', placeholder: 'Vista frontal del edificio', key: 'descripcion', required: false },
+              ] as Array<{ id: string; label: string; placeholder: string; key: keyof FormState; required: boolean }>).map(({ id, label, placeholder, key, required }) => (
+                <div key={id} className="flex flex-col gap-1">
+                  <label htmlFor={id} className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                    {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+                  </label>
+                  <input
+                    id={id}
+                    type="text"
+                    value={form[key] as string}
+                    onChange={(e) => setField(key, e.target.value)}
+                    placeholder={placeholder}
+                    className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Conexión RTSP */}
+            <div className="pt-2 border-t border-slate-100">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Conexión RTSP</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="rtsp_usuario" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                    Usuario RTSP <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="rtsp_usuario"
+                    type="text"
+                    value={form.rtsp_usuario}
+                    onChange={(e) => setField('rtsp_usuario', e.target.value)}
+                    placeholder="admin"
+                    className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="rtsp_password" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                    Contraseña RTSP
+                  </label>
+                  <input
+                    id="rtsp_password"
+                    type="password"
+                    value={form.rtsp_password}
+                    onChange={(e) => setField('rtsp_password', e.target.value)}
+                    placeholder="Contraseña de la cámara"
+                    autoComplete="new-password"
+                    className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="rtsp_puerto" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Puerto</label>
+                  <input
+                    id="rtsp_puerto"
+                    type="number"
+                    value={form.rtsp_puerto}
+                    onChange={(e) => setField('rtsp_puerto', e.target.value)}
+                    placeholder="554"
+                    min="1"
+                    max="65535"
+                    className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="rtsp_canal" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Canal</label>
+                    <input
+                      id="rtsp_canal"
+                      type="number"
+                      value={form.rtsp_canal}
+                      onChange={(e) => setField('rtsp_canal', e.target.value)}
+                      placeholder="1"
+                      min="1"
+                      className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="rtsp_subtipo" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Subtipo</label>
+                    <input
+                      id="rtsp_subtipo"
+                      type="number"
+                      value={form.rtsp_subtipo}
+                      onChange={(e) => setField('rtsp_subtipo', e.target.value)}
+                      placeholder="1"
+                      min="0"
+                      className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id="activa"
                 checked={form.activa}
-                onChange={(e) => setForm((f) => ({ ...f, activa: e.target.checked }))}
+                onChange={(e) => setField('activa', e.target.checked)}
                 className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
               <label htmlFor="activa" className="text-sm text-slate-600 select-none">
@@ -183,12 +269,12 @@ export default function CamarasPage() {
             </div>
 
             {formError && (
-              <div className="sm:col-span-2 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+              <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
                 {formError}
               </div>
             )}
 
-            <div className="sm:col-span-2 flex gap-3">
+            <div className="flex gap-3 pt-1">
               <button
                 type="submit"
                 disabled={submitting}
@@ -242,9 +328,17 @@ export default function CamarasPage() {
                     >
                       {cam.activa ? 'ACTIVA' : 'INACTIVA'}
                     </span>
+                    {cam.rtsp_tiene_password && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                        RTSP configurado
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs font-mono text-slate-500 mt-0.5">{cam.direccion_ip}</p>
+                  <p className="text-xs font-mono text-slate-500 mt-0.5">{cam.direccion_ip}:{cam.rtsp_puerto}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{cam.ubicacion}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Canal {cam.rtsp_canal} · Subtipo {cam.rtsp_subtipo} · Usuario: {cam.rtsp_usuario}
+                  </p>
                   {cam.descripcion && (
                     <p className="text-xs text-slate-400 mt-0.5 italic">{cam.descripcion}</p>
                   )}

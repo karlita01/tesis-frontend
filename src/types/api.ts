@@ -6,6 +6,11 @@ export interface CameraIP {
   descripcion: string | null;
   activa: boolean;
   fecha_registro: string | null;
+  rtsp_usuario: string;
+  rtsp_tiene_password: boolean;
+  rtsp_puerto: number;
+  rtsp_canal: number;
+  rtsp_subtipo: number;
 }
 
 export type VideoSourceType = 'webcam' | 'grabacion_previa' | 'camara_ip';

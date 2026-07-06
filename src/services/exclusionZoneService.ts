@@ -1,4 +1,4 @@
-import type { ExclusionRect, ExclusionZoneConfig } from '../types/zones';
+import type { ExclusionRect, ExclusionZoneConfig, HeatmapZona } from '../types/zones';
 import { apiFetch } from './apiClient';
 
 interface ZonesListResponse {
@@ -54,3 +54,6 @@ export const updateExclusionZone = (
 
 export const deleteExclusionZone = (id: number): Promise<{ message: string }> =>
   apiFetch(`/api/zonas-exclusion/${id}`, { method: 'DELETE' });
+
+export const getZoneHeatmap = (id: number): Promise<HeatmapZona> =>
+  apiFetch(`/api/zonas-exclusion/${id}/heatmap`);

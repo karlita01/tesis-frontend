@@ -40,8 +40,7 @@ const SOURCE_INFO: Record<VideoSourceType, { icon: string; title: string; descri
   },
   camara_ip: {
     icon: '📷', title: 'Cámara IP',
-    description: 'Selecciona una cámara IP activa registrada en el sistema.',
-    note: 'No hay conexión real en el prototipo. La integración se añadirá en la siguiente fase.',
+    description: 'Stream en vivo desde una cámara IP registrada con RTSP.',
   },
 };
 
@@ -121,6 +120,10 @@ export default function MonitoreoPage() {
   const selectedZoneIdRef = useRef<number | null>(null);
   const currentZoneRectsRef = useRef<ExclusionRect[]>([]);
   const captureCallbackRef = useRef<() => Promise<void>>(async () => {});
+
+  // ── Análisis cámara IP (MJPEG + SSE stats) ───────────────────────────────
+  const [cameraStats, setCameraStats] = useState<{ personas: number; nivel: NivelAglomeracion; alerta: boolean } | null>(null);
+  const cameraSseAbortRef = useRef<AbortController | null>(null);
 
   // ── Análisis video (SSE) ─────────────────────────────────────────────────
   const [videoAnalyzing, setVideoAnalyzing] = useState(false);
@@ -205,12 +208,55 @@ export default function MonitoreoPage() {
     }, 'image/jpeg', 0.85);
   };
 
+  // ── SSE de stats de cámara IP ────────────────────────────────────────────
+  function startCameraStatsSse(sesionId: number) {
+    cameraSseAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    cameraSseAbortRef.current = ctrl;
+    const token = localStorage.getItem('token') ?? '';
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_URL}/api/analisis/camara/${sesionId}/stream`,
+          { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal },
+        );
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            try {
+              const ev = JSON.parse(line.slice(5).trim()) as { tipo: string; personas: number; nivel: NivelAglomeracion; alerta: boolean };
+              if (ev.tipo === 'frame') {
+                setCameraStats({ personas: ev.personas, nivel: ev.nivel, alerta: ev.alerta });
+              }
+            } catch { /* ignorar líneas mal formadas */ }
+          }
+        }
+      } catch { /* abortado o desconectado */ }
+    })();
+  }
+
+  function stopCameraSse() {
+    cameraSseAbortRef.current?.abort();
+    cameraSseAbortRef.current = null;
+  }
+
   // ── Cleanup al desmontar ─────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       stopWebcam();
       cancelVideoRef.current?.();
       stopVideoRAF();
+      stopCameraSse();
     };
   }, []);
 
@@ -277,11 +323,36 @@ export default function MonitoreoPage() {
     function tick() {
       const c = canvasVideoRef.current;
       const v = videoAnalysisRef.current;
-      if (c && v) {
-        const w = v.clientWidth || v.videoWidth || 640;
-        const h = v.clientHeight || v.videoHeight || 360;
-        if (c.width !== w) c.width = w;
-        if (c.height !== h) c.height = h;
+      if (c && v && v.videoWidth > 0 && v.videoHeight > 0) {
+        // El <video> usa object-contain: si el aspect ratio del video no
+        // coincide con el del contenedor, queda con barras negras (letterbox).
+        // El canvas debe ocupar solo el área real donde se ve el video,
+        // si no, los bounding boxes quedan desalineados de la gente.
+        const elW = v.clientWidth;
+        const elH = v.clientHeight;
+        const elRatio = elW / elH;
+        const videoRatio = v.videoWidth / v.videoHeight;
+
+        let renderW: number, renderH: number, offsetX: number, offsetY: number;
+        if (videoRatio > elRatio) {
+          renderW = elW;
+          renderH = elW / videoRatio;
+          offsetX = 0;
+          offsetY = (elH - renderH) / 2;
+        } else {
+          renderH = elH;
+          renderW = elH * videoRatio;
+          offsetY = 0;
+          offsetX = (elW - renderW) / 2;
+        }
+
+        if (c.width !== renderW) c.width = renderW;
+        if (c.height !== renderH) c.height = renderH;
+        c.style.left = `${offsetX}px`;
+        c.style.top = `${offsetY}px`;
+        c.style.width = `${renderW}px`;
+        c.style.height = `${renderH}px`;
+
         // Usa el ref de zonas para tener siempre el valor actual
         drawScene(c, latestVideoDetRef.current, currentZoneRectsRef.current);
       }
@@ -339,6 +410,8 @@ export default function MonitoreoPage() {
 
       if (selectedType === 'webcam') {
         await startWebcam();
+      } else if (selectedType === 'camara_ip') {
+        startCameraStatsSse(s.id);
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Error al iniciar monitoreo.'); }
     finally { setStarting(false); }
@@ -351,6 +424,7 @@ export default function MonitoreoPage() {
     stopWebcam();
     cancelVideoRef.current?.();
     stopVideoRAF();
+    stopCameraSse();
     setVideoAnalyzing(false);
     try {
       const s = await stopMonitoring(session.id);
@@ -365,8 +439,9 @@ export default function MonitoreoPage() {
     setSelectedType(null); setSelectedCameraId(null); setSelectedRecordingId(null);
     setSelectedZoneId(null); setSession(null); setStep('select'); setError(null);
     setFrameResult(null); setVideoProgress(0); setVideoCurrentStats(null); setVideoFin(null);
-    setFps(null); setLatenciaMs(null);
+    setFps(null); setLatenciaMs(null); setCameraStats(null);
     latestVideoDetRef.current = [];
+    stopCameraSse();
   }
 
   // ── SSE análisis de video ─────────────────────────────────────────────────
@@ -668,11 +743,52 @@ export default function MonitoreoPage() {
             </div>
           )}
 
-          {/* ── CÁMARA IP: pendiente ─────────────────────────────────────── */}
+          {/* ── CÁMARA IP: stream MJPEG en vivo ──────────────────────────── */}
           {session.tipo_fuente === 'camara_ip' && step === 'active' && (
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-              <p className="text-3xl mb-3" aria-hidden="true">📷</p>
-              <p className="text-sm text-slate-500">Conexión real a cámara IP pendiente de integración.</p>
+            <div className="flex flex-col gap-4">
+              <div className="relative rounded-xl bg-slate-950 border border-slate-700 overflow-hidden aspect-video">
+                <img
+                  src={`${API_URL}/api/analisis/camara/${session.id}/mjpeg?token=${encodeURIComponent(localStorage.getItem('token') ?? '')}`}
+                  alt="Stream cámara IP"
+                  className="w-full h-full object-contain"
+                  onError={() => setError('No se pudo conectar al stream RTSP. Verifica la cámara y las credenciales.')}
+                />
+                <div className="absolute top-2 left-2 px-2 py-1 rounded bg-black/60 text-[10px] font-bold text-red-400 uppercase tracking-wide">
+                  LIVE
+                </div>
+              </div>
+
+              {cameraStats && (() => {
+                const ns = NIVEL_STYLE[cameraStats.nivel];
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <StatCard label="Grupo más grande" value={String(cameraStats.personas)} accent="blue" />
+                    <div className={`rounded-xl px-4 py-3 border ${ns.bg} ${ns.border}`}>
+                      <p className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">Nivel</p>
+                      <p className={`text-sm font-bold ${ns.text}`}>{ns.label}</p>
+                    </div>
+                    <div className={`rounded-xl px-4 py-3 border ${cameraStats.alerta ? 'bg-red-100 border-red-300' : 'bg-slate-50 border-slate-200'}`}>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">Alerta</p>
+                      <p className={`text-sm font-bold ${cameraStats.alerta ? 'text-red-700' : 'text-slate-400'}`}>
+                        {cameraStats.alerta ? '⚠ ACTIVA' : 'Sin alerta'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex flex-wrap gap-4 text-xs text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-sm border-2 border-cyan-400 inline-block" />
+                  Persona detectada
+                </span>
+                {selectedZone && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-sm border-2 border-dashed border-purple-500 inline-block" />
+                    Zona de exclusión (ignorada)
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -693,24 +809,19 @@ export default function MonitoreoPage() {
                   {(Object.keys(SOURCE_INFO) as VideoSourceType[]).map((tipo) => {
                     const info = SOURCE_INFO[tipo];
                     const active = selectedType === tipo;
-                    const disabled = tipo === 'camara_ip';
                     return (
                       <button
                         key={tipo}
-                        onClick={() => !disabled && handleSelectType(tipo)}
-                        disabled={disabled}
+                        onClick={() => handleSelectType(tipo)}
                         className={`text-left p-4 rounded-xl border-2 transition-all ${
-                          disabled
-                            ? 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed'
-                            : active
-                              ? 'border-[#2563EB] bg-blue-50'
-                              : 'border-slate-200 hover:border-slate-300 bg-white'
+                          active
+                            ? 'border-[#2563EB] bg-blue-50'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
                         }`}
                       >
                         <span className="text-2xl mb-2 block" aria-hidden="true">{info.icon}</span>
                         <p className={`text-sm font-semibold mb-1 ${active ? 'text-[#2563EB]' : 'text-[#0F172A]'}`}>
                           {info.title}
-                          {disabled && <span className="ml-2 text-[10px] font-normal text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full">No disponible</span>}
                         </p>
                         <p className="text-xs text-slate-500 leading-relaxed">{info.description}</p>
                       </button>

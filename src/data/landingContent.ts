@@ -3,7 +3,6 @@ export const NAV_LINKS = [
   { label: 'Problema', href: '#problema' },
   { label: 'Solución', href: '#solucion' },
   { label: 'Módulos', href: '#modulos' },
-  { label: 'Indicadores', href: '#indicadores' },
   { label: 'Privacidad', href: '#privacidad' },
   { label: 'Comparativa', href: '#comparacion' },
 ];
@@ -159,73 +158,6 @@ export const MODULES = [
   },
 ];
 
-export const KPIS = [
-  {
-    id: 'detection_time',
-    label: 'Tiempo promedio de detección',
-    value: 'Preparado para medir',
-    unit: 'segundos',
-    status: 'ready' as const,
-    description: 'Latencia desde la entrada del frame hasta la clasificación del nivel de riesgo.',
-  },
-  {
-    id: 'detection_rate',
-    label: 'Detecciones exitosas',
-    value: 'Indicador evaluable',
-    unit: '% del total',
-    status: 'validating' as const,
-    description: 'Proporción de personas correctamente detectadas frente al total visible.',
-  },
-  {
-    id: 'latency',
-    label: 'Latencia de procesamiento',
-    value: 'Según configuración',
-    unit: 'ms/frame',
-    status: 'ready' as const,
-    description: 'Tiempo de procesamiento por frame según hardware disponible.',
-  },
-  {
-    id: 'fps',
-    label: 'FPS del sistema',
-    value: 'Según configuración',
-    unit: 'frames/seg',
-    status: 'ready' as const,
-    description: 'Velocidad de análisis ajustable según los recursos del servidor.',
-  },
-  {
-    id: 'response_time',
-    label: 'Tiempo de respuesta operativa',
-    value: 'Comparación manual vs automática',
-    unit: '',
-    status: 'validating' as const,
-    description: 'Diferencia entre el tiempo de detección manual y el asistido por el sistema.',
-  },
-  {
-    id: 'critical_zones',
-    label: 'Zonas críticas identificadas',
-    value: 'En validación',
-    unit: 'zonas',
-    status: 'validating' as const,
-    description: 'Sectores que superaron el umbral de riesgo durante el período analizado.',
-  },
-  {
-    id: 'alerts_precision',
-    label: 'Alertas emitidas correctamente',
-    value: 'Indicador evaluable',
-    unit: '% del total',
-    status: 'validating' as const,
-    description: 'Precisión de las alertas generadas respecto a situaciones reales de riesgo.',
-  },
-  {
-    id: 'density_by_sector',
-    label: 'Nivel de densidad por sector',
-    value: 'Bajo / Medio / Alto',
-    unit: '',
-    status: 'ready' as const,
-    description: 'Clasificación de densidad por zona configurada durante el período evaluado.',
-  },
-];
-
 export const TECH_STACK = [
   { layer: 'Frontend', items: ['React + Vite', 'TypeScript', 'Tailwind CSS'], icon: '🖥️' },
   { layer: 'API', items: ['FastAPI', 'Python', 'REST + WebSocket'], icon: '⚙️' },
@@ -322,6 +254,5 @@ export const FOOTER_LINKS = [
   { label: 'Problema', href: '#problema' },
   { label: 'Solución', href: '#solucion' },
   { label: 'Módulos', href: '#modulos' },
-  { label: 'Indicadores', href: '#indicadores' },
   { label: 'Privacidad', href: '#privacidad' },
 ];

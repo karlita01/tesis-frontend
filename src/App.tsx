@@ -6,7 +6,6 @@ import HeroSection from './components/HeroSection';
 import ProblemSection from './components/ProblemSection';
 import SolutionFlow from './components/SolutionFlow';
 import ModulesGrid from './components/ModulesGrid';
-import KpiDashboard from './components/KpiDashboard';
 import PrivacySection from './components/PrivacySection';
 import UseCasesSection from './components/UseCasesSection';
 import ComparisonSection from './components/ComparisonSection';
@@ -17,6 +16,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import DashboardLayout from './components/dashboard/DashboardLayout';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import MonitoreoPage from './pages/dashboard/MonitoreoPage';
+import MulticamaraPage from './pages/dashboard/MulticamaraPage';
 import GrabacionesPage from './pages/dashboard/GrabacionesPage';
 import CamarasPage from './pages/dashboard/CamarasPage';
 import ZonasExclusionPage from './pages/dashboard/ZonasExclusionPage';
@@ -32,7 +32,6 @@ function LandingPage() {
         <ProblemSection />
         <SolutionFlow />
         <ModulesGrid />
-        <KpiDashboard />
         <PrivacySection />
         <UseCasesSection />
         <ComparisonSection />
@@ -61,6 +60,7 @@ export default function App() {
             >
               <Route index element={<DashboardHome />} />
               <Route path="monitoreo" element={<MonitoreoPage />} />
+              <Route path="multicamara" element={<MulticamaraPage />} />
               <Route path="grabaciones" element={<GrabacionesPage />} />
               <Route
                 path="camaras"

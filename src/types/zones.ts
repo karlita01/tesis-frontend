@@ -5,6 +5,17 @@ export interface ExclusionRect {
   height: number;
 }
 
+export interface HeatmapZona {
+  zona_config_id: number;
+  zona_nombre: string;
+  frame_referencia: string;
+  grid: number[][];
+  grid_ancho: number;
+  grid_alto: number;
+  total_detecciones: number;
+  actualizado_en: string | null;
+}
+
 export interface ExclusionZoneConfig {
   id: number;
   nombre: string;

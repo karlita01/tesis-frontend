@@ -7,6 +7,11 @@ export interface CreateCameraPayload {
   ubicacion: string;
   descripcion?: string;
   activa: boolean;
+  rtsp_usuario?: string;
+  rtsp_password?: string;
+  rtsp_puerto?: number;
+  rtsp_canal?: number;
+  rtsp_subtipo?: number;
 }
 
 export const getCameras = (): Promise<CameraIP[]> =>
