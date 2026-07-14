@@ -62,18 +62,6 @@ export default function DashboardHome() {
         <p className="text-slate-500 mt-1 text-sm">Panel de control · CrowdSense AI</p>
       </div>
 
-      <div className="mb-8 rounded-xl bg-[#0F172A] text-white px-6 py-5 flex items-start gap-4">
-        <span className="text-2xl mt-0.5 shrink-0" aria-hidden="true">🛡</span>
-        <div>
-          <p className="font-semibold text-base">Sistema en modo prototipo</p>
-          <p className="text-slate-400 text-sm mt-1 leading-relaxed">
-            La detección con YOLO y la conexión real a cámaras IP se integrarán en una fase
-            posterior. Por ahora puedes registrar configuraciones, cargar grabaciones e iniciar
-            sesiones de monitoreo.
-          </p>
-        </div>
-      </div>
-
       <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">
         Acceso rápido
       </h2>

@@ -94,7 +94,7 @@ export default function GrabacionesPage() {
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0F172A]">Grabaciones</h1>
-        <p className="text-slate-500 text-sm mt-1">RF-1.5 · Videos para análisis con YOLO</p>
+        <p className="text-slate-500 text-sm mt-1">Videos para análisis con YOLO</p>
       </div>
 
       {success && (

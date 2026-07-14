@@ -531,7 +531,6 @@ export default function MonitoreoPage() {
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0F172A]">Monitoreo</h1>
-        <p className="text-slate-500 text-sm mt-1">RF-1.2 · RF-1.3 · RF-1.4 · EP-003</p>
       </div>
 
       {success && <div className="mb-4 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">{success}</div>}

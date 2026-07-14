@@ -299,7 +299,7 @@ export default function ZonasExclusionPage() {
         <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-[#0F172A]">Zonas de exclusión</h1>
-            <p className="text-slate-500 text-sm mt-1">RF-2.1 a RF-2.5 · Solo administrador</p>
+            <p className="text-slate-500 text-sm mt-1">Solo administrador</p>
           </div>
           <button
             onClick={openCreate}
@@ -439,9 +439,6 @@ export default function ZonasExclusionPage() {
           <h1 className="text-2xl font-bold text-[#0F172A]">
             {mode === 'create' ? 'Nueva configuración' : `Editar: ${editingConfig?.nombre}`}
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            {mode === 'create' ? 'RF-2.1 · RF-2.2 · RF-2.3' : 'RF-2.4'}
-          </p>
         </div>
       </div>
 

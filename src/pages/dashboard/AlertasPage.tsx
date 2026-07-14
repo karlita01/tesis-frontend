@@ -61,7 +61,7 @@ export default function AlertasPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A]">Historial de alertas</h1>
           <p className="text-slate-500 text-sm mt-1">
-            EP-004 · Notificaciones de aglomeración detectadas
+            Notificaciones de aglomeración detectadas
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

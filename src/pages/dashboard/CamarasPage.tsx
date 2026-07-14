@@ -131,7 +131,7 @@ export default function CamarasPage() {
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A]">Cámaras IP</h1>
-          <p className="text-slate-500 text-sm mt-1">RF-1.1 · Solo administrador</p>
+          <p className="text-slate-500 text-sm mt-1">Solo administrador</p>
         </div>
         <button
           onClick={() => { setShowForm((v) => !v); setFormError(null); }}

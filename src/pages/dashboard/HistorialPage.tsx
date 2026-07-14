@@ -346,7 +346,7 @@ export default function HistorialPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0F172A]">Historial de análisis</h1>
-        <p className="text-slate-500 text-sm mt-1">EP-005 · Sesiones registradas y resumen por sector</p>
+        <p className="text-slate-500 text-sm mt-1">Sesiones registradas y resumen por sector</p>
       </div>
 
       {/* Tabs */}
