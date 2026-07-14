@@ -5,10 +5,7 @@ import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import ProblemSection from './components/ProblemSection';
 import SolutionFlow from './components/SolutionFlow';
-import ModulesGrid from './components/ModulesGrid';
 import PrivacySection from './components/PrivacySection';
-import UseCasesSection from './components/UseCasesSection';
-import ComparisonSection from './components/ComparisonSection';
 import Footer from './components/Footer';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -31,10 +28,7 @@ function LandingPage() {
         <HeroSection />
         <ProblemSection />
         <SolutionFlow />
-        <ModulesGrid />
         <PrivacySection />
-        <UseCasesSection />
-        <ComparisonSection />
       </main>
       <Footer />
     </div>

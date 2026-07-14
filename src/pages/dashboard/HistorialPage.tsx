@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { AnalysisResult, NivelAglomeracion, ZonaCritica } from '../../types/api';
-import type { HeatmapZona } from '../../types/zones';
-import { getHistorial, getZonasCriticas } from '../../services/analisisService';
-import { getZoneHeatmap } from '../../services/exclusionZoneService';
+import { getHistorial, getZonasCriticas, deleteResultado } from '../../services/analisisService';
+import { useAuth } from '../../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -40,10 +39,16 @@ function SessionList({
   resultados,
   loading,
   onReload,
+  isAdmin,
+  onDelete,
+  deletingId,
 }: {
   resultados: AnalysisResult[];
   loading: boolean;
   onReload: () => void;
+  isAdmin: boolean;
+  onDelete: (r: AnalysisResult) => void;
+  deletingId: number | null;
 }) {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -162,8 +167,17 @@ function SessionList({
                 </div>
 
                 {/* Fecha */}
-                <div className="text-right shrink-0">
+                <div className="text-right shrink-0 flex flex-col items-end gap-2">
                   <p className="text-xs text-slate-400">{formatDate(r.fecha_registro)}</p>
+                  {isAdmin && (
+                    <button
+                      onClick={() => onDelete(r)}
+                      disabled={deletingId === r.id}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === r.id ? '…' : 'Eliminar'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -181,151 +195,12 @@ function SessionList({
   );
 }
 
-// ── Mapa de calor de flujo peatonal ────────────────────────────────────────────
-
-function heatColor(t: number): string {
-  const alpha = 0.12 + 0.6 * t;
-  let r: number, g: number, b: number;
-  if (t < 0.33) {
-    const k = t / 0.33;
-    r = 0; g = Math.round(160 * k); b = Math.round(255 - 195 * k);
-  } else if (t < 0.66) {
-    const k = (t - 0.33) / 0.33;
-    r = Math.round(255 * k); g = Math.round(160 + 70 * k); b = Math.round(60 * (1 - k));
-  } else {
-    const k = (t - 0.66) / 0.34;
-    r = 255; g = Math.round(230 * (1 - k)); b = 0;
-  }
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-function drawHeatmapGrid(canvas: HTMLCanvasElement, grid: number[][], gridAncho: number, gridAlto: number) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  const w = canvas.width;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  const max = Math.max(1, ...grid.flat());
-  const cellW = w / gridAncho;
-  const cellH = h / gridAlto;
-  for (let gy = 0; gy < gridAlto; gy++) {
-    for (let gx = 0; gx < gridAncho; gx++) {
-      const v = grid[gy]?.[gx] ?? 0;
-      if (v === 0) continue;
-      ctx.fillStyle = heatColor(v / max);
-      ctx.fillRect(gx * cellW, gy * cellH, cellW + 1, cellH + 1);
-    }
-  }
-}
-
-function HeatmapModal({
-  zonaId,
-  zonaNombre,
-  onClose,
-}: {
-  zonaId: number;
-  zonaNombre: string;
-  onClose: () => void;
-}) {
-  const [data, setData] = useState<HeatmapZona | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setData(await getZoneHeatmap(zonaId));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Error al cargar el mapa de calor.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [zonaId]);
-
-  function paint() {
-    const img = imgRef.current;
-    const canvas = canvasRef.current;
-    if (!img || !canvas || !data) return;
-    canvas.width = img.clientWidth;
-    canvas.height = img.clientHeight;
-    drawHeatmapGrid(canvas, data.grid, data.grid_ancho, data.grid_alto);
-  }
-
-  useEffect(() => {
-    paint();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-xl overflow-hidden max-w-2xl w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold text-[#0F172A] text-sm">Mapa de calor — {zonaNombre}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Flujo peatonal acumulado de todas las sesiones analizadas</p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none shrink-0">✕</button>
-        </div>
-
-        <div className="p-5">
-          {loading ? (
-            <p className="text-slate-400 text-sm text-center py-12">Cargando…</p>
-          ) : error ? (
-            <p className="text-red-600 text-sm text-center py-12">{error}</p>
-          ) : data && data.total_detecciones === 0 ? (
-            <p className="text-slate-400 text-sm text-center py-12">
-              Aún no hay detecciones acumuladas para esta zona.
-              <br />
-              El mapa se va llenando a medida que se analizan sesiones asociadas a "{zonaNombre}".
-            </p>
-          ) : data ? (
-            <>
-              <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-950">
-                <img
-                  ref={imgRef}
-                  src={`${API_URL}/${data.frame_referencia.replace(/\\/g, '/')}`}
-                  alt={zonaNombre}
-                  className="w-full h-auto block"
-                  onLoad={paint}
-                />
-                <canvas
-                  ref={canvasRef}
-                  className="absolute inset-0 w-full h-full"
-                  style={{ pointerEvents: 'none' }}
-                />
-              </div>
-              <div className="flex items-center justify-between mt-3 text-xs text-slate-400">
-                <span>{data.total_detecciones} detecciones acumuladas</span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded-sm" style={{ background: 'rgba(0,120,255,0.6)' }} />
-                  Menos tránsito
-                  <span className="inline-block w-3 h-3 rounded-sm ml-2" style={{ background: 'rgba(255,0,0,0.75)' }} />
-                  Más tránsito
-                </span>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Vista: Zonas críticas ─────────────────────────────────────────────────────
 
 function ZonasCriticasView() {
   const [zonas, setZonas] = useState<ZonaCritica[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [heatmapZona, setHeatmapZona] = useState<{ id: number; nombre: string } | null>(null);
 
   async function load() {
     try {
@@ -419,24 +294,9 @@ function ZonasCriticasView() {
                 </div>
               </div>
             )}
-
-            <button
-              onClick={() => setHeatmapZona({ id: z.zona_id, nombre: z.zona_nombre })}
-              className="mt-1 self-start text-xs font-medium text-[#2563EB] hover:text-blue-700 transition-colors"
-            >
-              🗺 Ver mapa de calor
-            </button>
           </div>
         );
       })}
-
-      {heatmapZona && (
-        <HeatmapModal
-          zonaId={heatmapZona.id}
-          zonaNombre={heatmapZona.nombre}
-          onClose={() => setHeatmapZona(null)}
-        />
-      )}
     </div>
   );
 }
@@ -446,10 +306,12 @@ function ZonasCriticasView() {
 type Tab = 'sesiones' | 'zonas';
 
 export default function HistorialPage() {
+  const { isAdmin } = useAuth();
   const [tab, setTab] = useState<Tab>('sesiones');
   const [resultados, setResultados] = useState<AnalysisResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   async function loadSesiones() {
     try {
@@ -460,6 +322,20 @@ export default function HistorialPage() {
       setError(e instanceof Error ? e.message : 'Error al cargar historial.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDelete(r: AnalysisResult) {
+    if (!confirm(`¿Eliminar el resultado de la sesión #${r.sesion_id} del historial? Esta acción no se puede deshacer.`)) return;
+    setDeletingId(r.id);
+    setError(null);
+    try {
+      await deleteResultado(r.id);
+      await loadSesiones();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al eliminar el resultado.');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -507,6 +383,9 @@ export default function HistorialPage() {
           resultados={resultados}
           loading={loading}
           onReload={loadSesiones}
+          isAdmin={isAdmin}
+          onDelete={handleDelete}
+          deletingId={deletingId}
         />
       ) : (
         <ZonasCriticasView />

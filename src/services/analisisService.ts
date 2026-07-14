@@ -27,6 +27,9 @@ export const getHistorial = async (): Promise<AnalysisResult[]> => {
 export const getResultadoSesion = (sesionId: number): Promise<AnalysisResult> =>
   apiFetch(`/api/analisis/resultado/${sesionId}`);
 
+export const deleteResultado = (resultadoId: number): Promise<void> =>
+  apiFetch(`/api/analisis/resultado/${resultadoId}`, { method: 'DELETE' });
+
 export const getZonasCriticas = async (): Promise<ZonaCritica[]> => {
   const data = await apiFetch<{ zonas: ZonaCritica[] }>('/api/analisis/zonas-criticas');
   return data.zonas;

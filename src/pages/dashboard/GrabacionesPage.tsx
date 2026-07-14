@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Recording } from '../../types/api';
-import { uploadRecording, getRecordings } from '../../services/recordingService';
+import { uploadRecording, getRecordings, deleteRecording } from '../../services/recordingService';
 
 const ALLOWED_EXTS = ['.mp4', '.avi', '.mov', '.mkv'];
 
@@ -26,6 +26,7 @@ export default function GrabacionesPage() {
   const [error, setError] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -40,6 +41,22 @@ export default function GrabacionesPage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  async function handleDelete(rec: Recording) {
+    if (!confirm(`¿Eliminar la grabación "${rec.nombre_archivo}"? Esta acción no se puede deshacer.`)) return;
+    setDeletingId(rec.id);
+    setError(null);
+    try {
+      await deleteRecording(rec.id);
+      setSuccess('Grabación eliminada.');
+      setTimeout(() => setSuccess(null), 3500);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al eliminar grabación.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
@@ -209,6 +226,13 @@ export default function GrabacionesPage() {
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 shrink-0 mt-1">
                   #{rec.id}
                 </span>
+                <button
+                  onClick={() => handleDelete(rec)}
+                  disabled={deletingId === rec.id}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  {deletingId === rec.id ? '…' : 'Eliminar'}
+                </button>
               </li>
             ))}
           </ul>

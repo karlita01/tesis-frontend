@@ -12,3 +12,6 @@ export const getRecordings = async (): Promise<Recording[]> => {
   const data = await apiFetch<RecordingsListResponse>('/api/grabaciones');
   return data.grabaciones;
 };
+
+export const deleteRecording = (id: number): Promise<void> =>
+  apiFetch(`/api/grabaciones/${id}`, { method: 'DELETE' });

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { DensityBadge, StatusBadge } from './ui/StatusBadge';
 
 const MOCK_EVENTS_HERO = [
@@ -88,9 +89,9 @@ function HeroMockup() {
 
       {/* Panel inferior */}
       <div className="grid grid-cols-2 gap-px bg-white/5">
-        {/* Mini mapa de calor */}
+        {/* Mini panel de densidad */}
         <div className="bg-[#0d1526] p-3">
-          <p className="text-[10px] text-slate-500 mb-2 font-semibold uppercase tracking-wider">Mapa de calor</p>
+          <p className="text-[10px] text-slate-500 mb-2 font-semibold uppercase tracking-wider">Densidad por zona</p>
           <div className="relative rounded overflow-hidden" style={{ height: 60, background: '#060c18' }}>
             {[
               { left: '20%', top: '20%', size: 36, opacity: 0.85 },
@@ -198,13 +199,13 @@ export default function HeroSection() {
               <span>Ver cómo funciona</span>
               <span aria-hidden="true">→</span>
             </a>
-            <a
-              href="#modulos"
+            <Link
+              to="/register"
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-[#0F172A] font-semibold text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-              aria-label="Ver los módulos del sistema"
+              aria-label="Crear una cuenta en CrowdSense AI"
             >
-              Ver módulos
-            </a>
+              Crear cuenta
+            </Link>
           </div>
 
           <p className="text-xs text-slate-500 flex items-center gap-2">

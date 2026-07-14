@@ -44,6 +44,19 @@ const SOURCE_INFO: Record<VideoSourceType, { icon: string; title: string; descri
   },
 };
 
+type BufferedFrame = { t: number; detecciones: DetectionBox[] };
+
+/** Devuelve las detecciones del último evento cuyo timestamp_video <= t (búsqueda binaria). */
+function findDetectionsAt(buffer: BufferedFrame[], t: number): DetectionBox[] {
+  let lo = 0, hi = buffer.length - 1, result: DetectionBox[] = [];
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (buffer[mid].t <= t) { result = buffer[mid].detecciones; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return result;
+}
+
 /** Dibuja zonas de exclusión (violeta, línea punteada) y bounding boxes de detecciones. */
 function drawScene(
   canvas: HTMLCanvasElement,
@@ -114,6 +127,7 @@ export default function MonitoreoPage() {
   const canvasOverlayRef = useRef<HTMLCanvasElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
   const captureIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const capturingRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   // Refs para evitar stale closures en setInterval/RAF
   const sessionRef = useRef<MonitoringSession | null>(null);
@@ -134,7 +148,7 @@ export default function MonitoreoPage() {
   // Video player + canvas overlay para grabacion_previa
   const videoAnalysisRef = useRef<HTMLVideoElement>(null);
   const canvasVideoRef = useRef<HTMLCanvasElement>(null);
-  const latestVideoDetRef = useRef<DetectionBox[]>([]);
+  const videoDetBufferRef = useRef<BufferedFrame[]>([]);
   const rafRef = useRef<number | null>(null);
 
   // ── UI ───────────────────────────────────────────────────────────────────
@@ -181,7 +195,10 @@ export default function MonitoreoPage() {
     const currentSession = sessionRef.current;
     const currentZoneId = selectedZoneIdRef.current;
     const currentZoneRects = currentZoneRectsRef.current;
-    if (!video || !canvas || !currentSession || video.readyState < 2) return;
+    // No lanzar una captura nueva si la anterior todavía no responde — si no,
+    // con el backend más lento que el intervalo se amontonan peticiones en
+    // vuelo que siguen llegando incluso después de pulsar "Detener".
+    if (!video || !canvas || !currentSession || video.readyState < 2 || capturingRef.current) return;
 
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
@@ -189,8 +206,9 @@ export default function MonitoreoPage() {
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
 
+    capturingRef.current = true;
     canvas.toBlob(async (blob) => {
-      if (!blob) return;
+      if (!blob) { capturingRef.current = false; return; }
       try {
         const t0 = Date.now();
         const result = await analyzeFrame(currentSession.id, blob, currentZoneId);
@@ -204,6 +222,8 @@ export default function MonitoreoPage() {
         }
       } catch {
         // ignorar errores de frame individual
+      } finally {
+        capturingRef.current = false;
       }
     }, 'image/jpeg', 0.85);
   };
@@ -300,6 +320,7 @@ export default function MonitoreoPage() {
     if (fpsTimerRef.current) { clearInterval(fpsTimerRef.current); fpsTimerRef.current = null; }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
     fpsCounterRef.current = 0;
+    capturingRef.current = false;
     setWebcamActive(false);
     setFps(null);
     setLatenciaMs(null);
@@ -310,7 +331,7 @@ export default function MonitoreoPage() {
     if (fpsTimerRef.current) clearInterval(fpsTimerRef.current);
     fpsCounterRef.current = 0;
     // Usa el ref para que siempre llame a la versión más reciente del callback
-    captureIntervalRef.current = setInterval(() => { void captureCallbackRef.current?.(); }, 500);
+    captureIntervalRef.current = setInterval(() => { void captureCallbackRef.current?.(); }, 100);
     // Actualiza FPS cada segundo contando frames respondidos
     fpsTimerRef.current = setInterval(() => {
       setFps(fpsCounterRef.current);
@@ -354,7 +375,8 @@ export default function MonitoreoPage() {
         c.style.height = `${renderH}px`;
 
         // Usa el ref de zonas para tener siempre el valor actual
-        drawScene(c, latestVideoDetRef.current, currentZoneRectsRef.current);
+        const detecciones = findDetectionsAt(videoDetBufferRef.current, v.currentTime);
+        drawScene(c, detecciones, currentZoneRectsRef.current);
       }
       rafRef.current = requestAnimationFrame(tick);
     }
@@ -440,7 +462,7 @@ export default function MonitoreoPage() {
     setSelectedZoneId(null); setSession(null); setStep('select'); setError(null);
     setFrameResult(null); setVideoProgress(0); setVideoCurrentStats(null); setVideoFin(null);
     setFps(null); setLatenciaMs(null); setCameraStats(null);
-    latestVideoDetRef.current = [];
+    videoDetBufferRef.current = [];
     stopCameraSse();
   }
 
@@ -451,7 +473,7 @@ export default function MonitoreoPage() {
     setVideoProgress(0);
     setVideoCurrentStats(null);
     setVideoFin(null);
-    latestVideoDetRef.current = [];
+    videoDetBufferRef.current = [];
 
     // Arrancar el video en el player y el RAF para las cajas
     if (videoAnalysisRef.current && selectedRecordingId != null) {
@@ -467,15 +489,18 @@ export default function MonitoreoPage() {
         if (ev.tipo === 'frame') {
           setVideoProgress(ev.progreso ?? 0);
           setVideoCurrentStats(ev);
-          // Actualizar las detecciones más recientes para el RAF
-          latestVideoDetRef.current = ev.detecciones ?? [];
+          // Encolar las detecciones con su timestamp para que el RAF las
+          // sincronice con currentTime — el análisis SSE corre más rápido
+          // que la reproducción real, no se puede usar solo "la última".
+          videoDetBufferRef.current.push({ t: ev.timestamp_video ?? 0, detecciones: ev.detecciones ?? [] });
         }
         if (ev.tipo === 'fin') {
           setVideoFin(ev);
           setVideoAnalyzing(false);
-          stopVideoRAF();
           cancelVideoRef.current = null;
-          latestVideoDetRef.current = [];
+          // No se detiene el RAF aquí: el <video> puede seguir reproduciéndose
+          // más tiempo real que lo que tardó el análisis SSE en terminar.
+          // El RAF se detiene con el evento nativo 'ended' del <video>.
         }
         if (ev.tipo === 'error') {
           setError(ev.mensaje ?? 'Error en el análisis.');
@@ -483,7 +508,7 @@ export default function MonitoreoPage() {
           stopVideoRAF();
         }
       },
-      () => { setVideoAnalyzing(false); stopVideoRAF(); },
+      () => { setVideoAnalyzing(false); },
       (msg) => { setError(msg); setVideoAnalyzing(false); stopVideoRAF(); },
     );
     cancelVideoRef.current = cancel;
@@ -629,6 +654,7 @@ export default function MonitoreoPage() {
                     muted
                     playsInline
                     controls={!videoAnalyzing}
+                    onEnded={() => stopVideoRAF()}
                   />
                   <canvas
                     ref={canvasVideoRef}
