@@ -122,9 +122,18 @@ function CameraTile({ camera, onHide }: { camera: CameraIP; onHide: () => void }
     if (countdownTimerRef.current) { clearInterval(countdownTimerRef.current); countdownTimerRef.current = null; }
   }, []);
 
+  // Devuelve la promesa del inicio de sesión (no solo dispara el side-effect):
+  // el cleanup del efecto de montaje la captura por closure para poder
+  // detener la sesión correcta aunque el cleanup corra ANTES de que la
+  // petición resuelva (pasa con React StrictMode, que monta/desmonta cada
+  // componente dos veces en desarrollo). Si solo lee sessionIdRef.current en
+  // ese momento, todavía está en null y la sesión vieja nunca se cierra —
+  // el backend igual la cierra por su cuenta (nunca hay 2 hilos vivos para
+  // la misma cámara), pero el navegador se queda apuntando al id viejo, ya
+  // cerrado, y sale un 409 al pedir el stream.
   const connectSession = useCallback(() => {
     setStatus('starting');
-    startMonitoring({
+    return startMonitoring({
       tipo_fuente: 'camara_ip',
       camara_id: camera.id,
       // Multicámara no tiene selector de zona por sesión: usa la zona por
@@ -133,26 +142,29 @@ function CameraTile({ camera, onHide }: { camera: CameraIP; onHide: () => void }
       ...(camera.zona_exclusion_id != null ? { zona_exclusion_id: camera.zona_exclusion_id } : {}),
     })
       .then((s) => {
-        if (!mountedRef.current) return;
-        sessionIdRef.current = s.id;
-        setRetryKey((k) => k + 1);
+        if (mountedRef.current) {
+          sessionIdRef.current = s.id;
+          setRetryKey((k) => k + 1);
+        }
+        return s;
       })
       .catch(() => {
         if (mountedRef.current) setStatus('failed');
+        return null;
       });
   }, [camera.id]);
 
   // Iniciar sesión de monitoreo al montar; detenerla al desmontar/ocultar.
   useEffect(() => {
     mountedRef.current = true;
-    connectSession();
+    const sessionPromise = connectSession();
     return () => {
       mountedRef.current = false;
       clearTimers();
       sseAbortRef.current?.abort();
-      if (sessionIdRef.current != null) {
-        stopMonitoring(sessionIdRef.current).catch(() => {});
-      }
+      sessionPromise.then((s) => {
+        if (s?.id != null) stopMonitoring(s.id).catch(() => {});
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectSession, clearTimers]);
