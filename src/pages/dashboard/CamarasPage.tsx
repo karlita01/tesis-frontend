@@ -4,8 +4,11 @@ import {
   getCameras,
   createCamera,
   updateCameraStatus,
+  updateCameraZona,
   deleteCamera,
 } from '../../services/cameraService';
+import { getExclusionZones } from '../../services/exclusionZoneService';
+import type { ExclusionZoneConfig } from '../../types/zones';
 
 interface FormState {
   nombre: string;
@@ -18,6 +21,7 @@ interface FormState {
   rtsp_puerto: string;
   rtsp_canal: string;
   rtsp_subtipo: string;
+  zona_exclusion_id: string;
 }
 
 const EMPTY: FormState = {
@@ -31,10 +35,12 @@ const EMPTY: FormState = {
   rtsp_puerto: '554',
   rtsp_canal: '1',
   rtsp_subtipo: '1',
+  zona_exclusion_id: '',
 };
 
 export default function CamarasPage() {
   const [cameras, setCameras] = useState<CameraIP[]>([]);
+  const [zones, setZones] = useState<ExclusionZoneConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -44,11 +50,17 @@ export default function CamarasPage() {
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [savingZonaId, setSavingZonaId] = useState<number | null>(null);
 
   async function load() {
     try {
       setLoading(true);
-      setCameras(await getCameras());
+      const [cams, zoneList] = await Promise.all([
+        getCameras(),
+        getExclusionZones().catch(() => [] as ExclusionZoneConfig[]),
+      ]);
+      setCameras(cams);
+      setZones(zoneList);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar cámaras.');
     } finally {
@@ -57,6 +69,20 @@ export default function CamarasPage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  async function handleZonaChange(cam: CameraIP, value: string) {
+    const zonaId = value === '' ? null : Number(value);
+    setSavingZonaId(cam.id);
+    try {
+      await updateCameraZona(cam.id, zonaId);
+      flash('Zona de exclusión actualizada.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al actualizar la zona.');
+    } finally {
+      setSavingZonaId(null);
+    }
+  }
 
   function flash(msg: string) {
     setSuccess(msg);
@@ -83,6 +109,7 @@ export default function CamarasPage() {
         rtsp_puerto: parseInt(form.rtsp_puerto) || 554,
         rtsp_canal: parseInt(form.rtsp_canal) || 1,
         rtsp_subtipo: parseInt(form.rtsp_subtipo) || 1,
+        zona_exclusion_id: form.zona_exclusion_id ? Number(form.zona_exclusion_id) : null,
       });
       setForm(EMPTY);
       setShowForm(false);
@@ -255,6 +282,26 @@ export default function CamarasPage() {
               </div>
             </div>
 
+            <div className="flex flex-col gap-1">
+              <label htmlFor="zona_exclusion_id" className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                Zona de exclusión por defecto
+              </label>
+              <select
+                id="zona_exclusion_id"
+                value={form.zona_exclusion_id}
+                onChange={(e) => setField('zona_exclusion_id', e.target.value)}
+                className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">Sin zona (umbrales por defecto)</option>
+                {zones.map((z) => (
+                  <option key={z.id} value={z.id}>{z.nombre}</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-slate-400">
+                Se aplica automáticamente en la vista multicámara, donde no hay selector manual por sesión.
+              </p>
+            </div>
+
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -342,6 +389,23 @@ export default function CamarasPage() {
                   {cam.descripcion && (
                     <p className="text-xs text-slate-400 mt-0.5 italic">{cam.descripcion}</p>
                   )}
+                  <div className="mt-2 flex items-center gap-2">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide shrink-0">
+                      Zona:
+                    </label>
+                    <select
+                      value={cam.zona_exclusion_id ?? ''}
+                      onChange={(e) => handleZonaChange(cam, e.target.value)}
+                      disabled={savingZonaId === cam.id}
+                      className="text-xs px-2 py-1 rounded-lg border border-slate-200 bg-white disabled:opacity-50"
+                    >
+                      <option value="">Sin zona (umbrales por defecto)</option>
+                      {zones.map((z) => (
+                        <option key={z.id} value={z.id}>{z.nombre}</option>
+                      ))}
+                    </select>
+                    {savingZonaId === cam.id && <span className="text-[10px] text-slate-400">Guardando…</span>}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button

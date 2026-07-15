@@ -164,12 +164,16 @@ export default function MonitoreoPage() {
   const loadData = useCallback(async () => {
     try {
       setLoadingSources(true);
+      // Cada fetch aislado con su propio catch: una falla transitoria en una
+      // (ej. /api/grabaciones) no debe tumbar a las demás (ej. cámaras IP),
+      // o la UI muestra "no hay cámaras" aunque sí existan.
       const [data, recs, zoneList] = await Promise.all([
-        getVideoSources(),
-        getRecordings(),
+        getVideoSources().catch(() => null),
+        getRecordings().catch(() => [] as Recording[]),
         getExclusionZones().catch(() => [] as ExclusionZoneConfig[]),
       ]);
-      setSourcesData(data);
+      if (data) setSourcesData(data);
+      else setError('No se pudieron cargar las fuentes de video. Intenta recargar.');
       setRecordings(recs);
       setZones(zoneList);
     } catch (e) {

@@ -124,7 +124,14 @@ function CameraTile({ camera, onHide }: { camera: CameraIP; onHide: () => void }
 
   const connectSession = useCallback(() => {
     setStatus('starting');
-    startMonitoring({ tipo_fuente: 'camara_ip', camara_id: camera.id })
+    startMonitoring({
+      tipo_fuente: 'camara_ip',
+      camara_id: camera.id,
+      // Multicámara no tiene selector de zona por sesión: usa la zona por
+      // defecto configurada en la cámara (el backend también hace este
+      // fallback si se omite, pero se manda explícito para que quede claro).
+      ...(camera.zona_exclusion_id != null ? { zona_exclusion_id: camera.zona_exclusion_id } : {}),
+    })
       .then((s) => {
         if (!mountedRef.current) return;
         sessionIdRef.current = s.id;

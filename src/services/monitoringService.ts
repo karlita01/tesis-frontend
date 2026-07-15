@@ -5,6 +5,7 @@ export interface StartMonitoringPayload {
   tipo_fuente: VideoSourceType;
   camara_id?: number;
   grabacion_id?: number;
+  zona_exclusion_id?: number;
 }
 
 export const startMonitoring = (data: StartMonitoringPayload): Promise<MonitoringSession> =>

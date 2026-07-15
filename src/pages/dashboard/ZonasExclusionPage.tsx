@@ -239,8 +239,8 @@ export default function ZonasExclusionPage() {
     setError(null);
     if (!nombre.trim()) { setError('El nombre es requerido.'); return; }
     if (mode === 'create' && !selectedFile) { setError('Captura o sube un frame de referencia para continuar.'); return; }
-    if (rects.length === 0) { setError('Dibuja al menos una zona de exclusión sobre el frame.'); return; }
-
+    // Dibujar rectángulos es opcional: esta configuración también sirve solo
+    // para personalizar umbrales sin excluir ninguna área del conteo.
     if (umbralAlto <= umbralMedio) { setError('El umbral Alto debe ser mayor que el umbral Medio.'); return; }
 
     setSaving(true);

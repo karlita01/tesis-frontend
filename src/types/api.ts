@@ -11,6 +11,7 @@ export interface CameraIP {
   rtsp_puerto: number;
   rtsp_canal: number;
   rtsp_subtipo: number;
+  zona_exclusion_id: number | null;
 }
 
 export type VideoSourceType = 'webcam' | 'grabacion_previa' | 'camara_ip';

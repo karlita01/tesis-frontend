@@ -12,6 +12,7 @@ export interface CreateCameraPayload {
   rtsp_puerto?: number;
   rtsp_canal?: number;
   rtsp_subtipo?: number;
+  zona_exclusion_id?: number | null;
 }
 
 export const getCameras = (): Promise<CameraIP[]> =>
@@ -24,6 +25,12 @@ export const updateCameraStatus = (id: number, activa: boolean): Promise<CameraI
   apiFetch(`/api/camaras/${id}/estado`, {
     method: 'PATCH',
     body: JSON.stringify({ activa }),
+  });
+
+export const updateCameraZona = (id: number, zona_exclusion_id: number | null): Promise<CameraIP> =>
+  apiFetch(`/api/camaras/${id}/zona`, {
+    method: 'PATCH',
+    body: JSON.stringify({ zona_exclusion_id }),
   });
 
 export const deleteCamera = (id: number): Promise<void> =>
