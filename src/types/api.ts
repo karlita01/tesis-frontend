@@ -131,6 +131,7 @@ export interface Alerta {
   fecha_atencion: string | null;
   camara_id?: number | null;
   camara_nombre?: string | null;
+  clip_evidencia?: string | null;   // ruta al clip de video (5-8 s previos a la alerta)
 }
 
 export interface AlertaSSEEvent {

@@ -3,6 +3,8 @@ import type { Alerta } from '../../types/api';
 import { getAlertas } from '../../services/alertaService';
 import { useAlerts } from '../../context/AlertContext';
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+
 function formatDate(s: string | null): string {
   if (!s) return '—';
   try {
@@ -129,6 +131,8 @@ function AlertRow({
   alerta: Alerta;
   onAtender: (id: number) => void;
 }) {
+  const [verClip, setVerClip] = useState(false);
+
   return (
     <div
       className={`bg-white rounded-xl border shadow-sm p-5 flex items-start gap-4 flex-wrap transition-colors ${
@@ -163,7 +167,24 @@ function AlertRow({
           {alerta.atendida && alerta.fecha_atencion && (
             <span>Atendida: {formatDate(alerta.fecha_atencion)}</span>
           )}
+          {alerta.clip_evidencia && (
+            <button
+              onClick={() => setVerClip((v) => !v)}
+              className="text-[#2563EB] font-medium hover:underline"
+            >
+              {verClip ? 'Ocultar clip' : '▶ Ver clip (evidencia)'}
+            </button>
+          )}
         </div>
+        {verClip && alerta.clip_evidencia && (
+          <video
+            className="mt-3 rounded-lg border border-slate-200 max-w-sm w-full"
+            src={`${API_URL}/${alerta.clip_evidencia}`}
+            controls
+            autoPlay
+            muted
+          />
+        )}
       </div>
 
       <div className="shrink-0">
