@@ -66,7 +66,7 @@ function SessionList({
         <p className="text-3xl mb-3" aria-hidden="true">📊</p>
         <p className="font-medium text-slate-600 text-sm">Sin análisis registrados</p>
         <p className="text-slate-400 text-xs mt-1">
-          Los resultados aparecen aquí después de analizar un video o sesión de webcam.
+          Los resultados aparecen aquí después de analizar un video o una sesión de cámara IP.
         </p>
       </div>
     );

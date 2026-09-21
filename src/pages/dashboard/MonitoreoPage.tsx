@@ -4,7 +4,6 @@ import type {
   VideoSourcesResponse,
   MonitoringSession,
   Recording,
-  FrameAnalysisResult,
   DetectionBox,
   NivelAglomeracion,
   VideoSSEEvent,
@@ -14,7 +13,7 @@ import { getVideoSources, selectVideoSource } from '../../services/videoSourceSe
 import { getRecordings, uploadRecording, deleteRecording } from '../../services/recordingService';
 import { startMonitoring, stopMonitoring } from '../../services/monitoringService';
 import { getExclusionZones } from '../../services/exclusionZoneService';
-import { analyzeFrame, streamVideoAnalisis } from '../../services/analisisService';
+import { streamVideoAnalisis } from '../../services/analisisService';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -29,11 +28,6 @@ const NIVEL_STYLE: Record<NivelAglomeracion, NivelColor> = {
 };
 
 const SOURCE_INFO: Record<VideoSourceType, { icon: string; title: string; description: string; note?: string }> = {
-  webcam: {
-    icon: '🎥', title: 'Webcam del navegador',
-    description: 'Captura video directamente desde la cámara del dispositivo.',
-    note: 'La captura es responsabilidad del navegador. El backend solo registra la sesión.',
-  },
   grabacion_previa: {
     icon: '📁', title: 'Grabación previa',
     description: 'Usa un video subido anteriormente como fuente de análisis.',
@@ -121,25 +115,10 @@ export default function MonitoreoPage() {
   const [step, setStep] = useState<Step>('select');
   const [session, setSession] = useState<MonitoringSession | null>(null);
 
-  // ── Análisis webcam ──────────────────────────────────────────────────────
-  const [webcamActive, setWebcamActive] = useState(false);
-  const [frameResult, setFrameResult] = useState<FrameAnalysisResult | null>(null);
-  // RF-5.4: métricas de rendimiento
-  const [latenciaMs, setLatenciaMs] = useState<number | null>(null);
-  const [fps, setFps] = useState<number | null>(null);
-  const fpsCounterRef = useRef(0);
-  const fpsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasOverlayRef = useRef<HTMLCanvasElement>(null);
-  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
-  const captureIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const capturingRef = useRef(false);
-  const streamRef = useRef<MediaStream | null>(null);
   // Refs para evitar stale closures en setInterval/RAF
   const sessionRef = useRef<MonitoringSession | null>(null);
   const selectedZoneIdRef = useRef<number | null>(null);
   const currentZoneRectsRef = useRef<ExclusionRect[]>([]);
-  const captureCallbackRef = useRef<() => Promise<void>>(async () => {});
 
   // ── Análisis cámara IP (MJPEG + SSE stats) ───────────────────────────────
   const [cameraStats, setCameraStats] = useState<{ personas: number; nivel: NivelAglomeracion; alerta: boolean } | null>(null);
@@ -235,47 +214,6 @@ export default function MonitoreoPage() {
   selectedZoneIdRef.current = selectedZoneId;
   currentZoneRectsRef.current = zones.find((z) => z.id === selectedZoneId)?.zonas ?? [];
 
-  // ── captureAndSend como ref para que el interval use siempre la versión actual ──
-  captureCallbackRef.current = async () => {
-    const video = videoRef.current;
-    const canvas = captureCanvasRef.current;
-    const overlay = canvasOverlayRef.current;
-    const currentSession = sessionRef.current;
-    const currentZoneId = selectedZoneIdRef.current;
-    const currentZoneRects = currentZoneRectsRef.current;
-    // No lanzar una captura nueva si la anterior todavía no responde — si no,
-    // con el backend más lento que el intervalo se amontonan peticiones en
-    // vuelo que siguen llegando incluso después de pulsar "Detener".
-    if (!video || !canvas || !currentSession || video.readyState < 2 || capturingRef.current) return;
-
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-
-    capturingRef.current = true;
-    canvas.toBlob(async (blob) => {
-      if (!blob) { capturingRef.current = false; return; }
-      try {
-        const t0 = Date.now();
-        const result = await analyzeFrame(currentSession.id, blob, currentZoneId);
-        setLatenciaMs(Date.now() - t0);
-        fpsCounterRef.current++;
-        setFrameResult(result);
-        if (overlay && video) {
-          overlay.width = video.clientWidth;
-          overlay.height = video.clientHeight;
-          drawScene(overlay, result.detecciones, currentZoneRects);
-        }
-      } catch {
-        // ignorar errores de frame individual
-      } finally {
-        capturingRef.current = false;
-      }
-    }, 'image/jpeg', 0.85);
-  };
-
   // ── SSE de stats de cámara IP ────────────────────────────────────────────
   function startCameraStatsSse(sesionId: number) {
     cameraSseAbortRef.current?.abort();
@@ -321,71 +259,11 @@ export default function MonitoreoPage() {
   // ── Cleanup al desmontar ─────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      stopWebcam();
       cancelVideoRef.current?.();
       stopVideoRAF();
       stopCameraSse();
     };
   }, []);
-
-  // ── Dibujar zonas en canvas webcam cuando la cámara arranca ─────────────
-  useEffect(() => {
-    if (!webcamActive) return;
-    const video = videoRef.current;
-    const canvas = canvasOverlayRef.current;
-    if (!video || !canvas) return;
-
-    function onPlay() {
-      if (!canvas || !video) return;
-      canvas.width = video.clientWidth;
-      canvas.height = video.clientHeight;
-      drawScene(canvas, [], selectedZone?.zonas ?? []);
-    }
-    video.addEventListener('play', onPlay);
-    // También dibujar si ya está reproduciendo
-    if (!video.paused) onPlay();
-    return () => video.removeEventListener('play', onPlay);
-  }, [webcamActive, selectedZoneId, zones]);
-
-  // ── Webcam helpers ───────────────────────────────────────────────────────
-  async function startWebcam() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setWebcamActive(true);
-      beginCapture();
-    } catch {
-      setError('No se pudo acceder a la cámara. Verifica los permisos del navegador.');
-    }
-  }
-
-  function stopWebcam() {
-    if (captureIntervalRef.current) { clearInterval(captureIntervalRef.current); captureIntervalRef.current = null; }
-    if (fpsTimerRef.current) { clearInterval(fpsTimerRef.current); fpsTimerRef.current = null; }
-    if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
-    fpsCounterRef.current = 0;
-    capturingRef.current = false;
-    setWebcamActive(false);
-    setFps(null);
-    setLatenciaMs(null);
-  }
-
-  function beginCapture() {
-    if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
-    if (fpsTimerRef.current) clearInterval(fpsTimerRef.current);
-    fpsCounterRef.current = 0;
-    // Usa el ref para que siempre llame a la versión más reciente del callback
-    captureIntervalRef.current = setInterval(() => { void captureCallbackRef.current?.(); }, 100);
-    // Actualiza FPS cada segundo contando frames respondidos
-    fpsTimerRef.current = setInterval(() => {
-      setFps(fpsCounterRef.current);
-      fpsCounterRef.current = 0;
-    }, 1000);
-  }
 
   // ── RAF loop para canvas sobre video de análisis ─────────────────────────
   function startVideoRAF() {
@@ -478,9 +356,7 @@ export default function MonitoreoPage() {
       setStep('active');
       flash('Monitoreo iniciado.');
 
-      if (selectedType === 'webcam') {
-        await startWebcam();
-      } else if (selectedType === 'camara_ip') {
+      if (selectedType === 'camara_ip') {
         startCameraStatsSse(s.id);
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Error al iniciar monitoreo.'); }
@@ -491,7 +367,6 @@ export default function MonitoreoPage() {
     if (!session) return;
     setStopping(true);
     setError(null);
-    stopWebcam();
     cancelVideoRef.current?.();
     stopVideoRAF();
     stopCameraSse();
@@ -508,8 +383,8 @@ export default function MonitoreoPage() {
   function handleReset() {
     setSelectedType(null); setSelectedCameraId(null); setSelectedRecordingId(null);
     setSelectedZoneId(null); setSession(null); setStep('select'); setError(null);
-    setFrameResult(null); setVideoProgress(0); setVideoCurrentStats(null); setVideoFin(null);
-    setFps(null); setLatenciaMs(null); setCameraStats(null);
+    setVideoProgress(0); setVideoCurrentStats(null); setVideoFin(null);
+    setCameraStats(null);
     videoDetBufferRef.current = [];
     stopCameraSse();
   }
@@ -565,8 +440,6 @@ export default function MonitoreoPage() {
   // ── Valores derivados ────────────────────────────────────────────────────
   const activeCameras = sourcesData?.camaras_ip.filter((c) => c.activa) ?? [];
   const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? null;
-  const nivel = frameResult?.nivel ?? 'sin_aglomeracion';
-  const nivelStyle = NIVEL_STYLE[nivel];
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -574,9 +447,6 @@ export default function MonitoreoPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Hidden canvases */}
-      <canvas ref={captureCanvasRef} className="hidden" />
-
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0F172A]">Monitoreo</h1>
       </div>
@@ -616,77 +486,6 @@ export default function MonitoreoPage() {
               )}
             </div>
           </div>
-
-          {/* ── WEBCAM: video + overlay ─────────────────────────────────── */}
-          {session.tipo_fuente === 'webcam' && step === 'active' && (
-            <div className="flex flex-col gap-4">
-              <div className="relative rounded-xl bg-slate-950 border border-slate-700 overflow-hidden aspect-video">
-                <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-                <canvas
-                  ref={canvasOverlayRef}
-                  className="absolute inset-0 w-full h-full"
-                  style={{ pointerEvents: 'none' }}
-                />
-                {!webcamActive && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <p className="text-slate-400 text-sm">Iniciando cámara…</p>
-                  </div>
-                )}
-              </div>
-
-              {frameResult && (
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <StatCard label="Grupo más grande" value={String(frameResult.personas)} accent="blue" />
-                    <div className={`rounded-xl px-4 py-3 border ${nivelStyle.bg} ${nivelStyle.border}`}>
-                      <p className="text-[10px] uppercase tracking-wide opacity-60 mb-0.5">Nivel</p>
-                      <p className={`text-sm font-bold ${nivelStyle.text}`}>{nivelStyle.label}</p>
-                    </div>
-                    <StatCard label="Máx. sesión" value={String(frameResult.personas_maximas)} accent="slate" />
-                    <div className={`rounded-xl px-4 py-3 border ${frameResult.alerta_activada ? 'bg-red-100 border-red-300' : 'bg-slate-50 border-slate-200'}`}>
-                      <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">Alerta</p>
-                      <p className={`text-sm font-bold ${frameResult.alerta_activada ? 'text-red-700' : 'text-slate-400'}`}>
-                        {frameResult.alerta_activada ? '⚠ ACTIVA' : 'Sin alerta'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* RF-5.4 — Métricas de rendimiento */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl px-4 py-3 border border-slate-200 bg-slate-50">
-                      <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">FPS analizados</p>
-                      <p className="text-sm font-bold text-[#0F172A]">
-                        {fps != null ? `${fps} fps` : '—'}
-                      </p>
-                    </div>
-                    <div className={`rounded-xl px-4 py-3 border ${
-                      latenciaMs != null && latenciaMs > 800
-                        ? 'bg-amber-50 border-amber-200'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-0.5">Latencia backend</p>
-                      <p className={`text-sm font-bold ${latenciaMs != null && latenciaMs > 800 ? 'text-amber-700' : 'text-[#0F172A]'}`}>
-                        {latenciaMs != null ? `${latenciaMs} ms` : '—'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-4 text-xs text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm border-2 border-cyan-400 inline-block" />
-                  Persona detectada
-                </span>
-                {selectedZone && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-sm border-2 border-dashed border-purple-500 inline-block" />
-                    Zona de exclusión (ignorada)
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* ── GRABACIÓN PREVIA: análisis SSE + video player ────────────── */}
           {session.tipo_fuente === 'grabacion_previa' && (
@@ -878,7 +677,7 @@ export default function MonitoreoPage() {
               {loadingSources ? (
                 <p className="text-slate-400 text-sm text-center py-4">Cargando fuentes…</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {(Object.keys(SOURCE_INFO) as VideoSourceType[]).map((tipo) => {
                     const info = SOURCE_INFO[tipo];
                     const active = selectedType === tipo;

@@ -63,7 +63,7 @@ VITE_API_URL=http://localhost:8000
 | `/login` | Inicio de sesión | Público |
 | `/register` | Registro de cuenta | Público |
 | `/dashboard` | Panel principal con accesos rápidos | Autenticado |
-| `/dashboard/monitoreo` | Análisis en tiempo real (webcam o grabación) | Autenticado |
+| `/dashboard/monitoreo` | Análisis en tiempo real (cámara IP o grabación) | Autenticado |
 | `/dashboard/grabaciones` | Subida y listado de grabaciones de video | Autenticado |
 | `/dashboard/historial` | Historial de sesiones y resumen por zonas | Autenticado |
 | `/dashboard/alertas` | Historial de alertas con filtros | Autenticado |
@@ -84,7 +84,7 @@ VITE_API_URL=http://localhost:8000
 ## Funcionalidades principales
 
 ### Monitoreo
-Tres modos de fuente: **webcam** (captura en tiempo real desde el navegador), **grabación previa** (video previamente subido, análisis via SSE), **cámara IP** (integración futura). Muestra detecciones sobre canvas overlay, nivel de concentración, FPS y latencia del backend.
+Dos modos de fuente: **grabación previa** (video previamente subido, análisis vía SSE) y **cámara IP** (stream en vivo RTSP/MJPEG). Muestra detecciones sobre canvas overlay y nivel de concentración.
 
 ### Historial
 Lista de sesiones analizadas con zona del sector, tipo de día (laborable/fin de semana), nivel máximo, número de personas y thumbnail del frame con mayor concentración. Tab adicional con resumen agregado por zona (tasa de alerta, promedio de personas, criticidad).

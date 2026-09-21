@@ -14,7 +14,7 @@ export interface CameraIP {
   zona_exclusion_id: number | null;
 }
 
-export type VideoSourceType = 'webcam' | 'grabacion_previa' | 'camara_ip';
+export type VideoSourceType = 'grabacion_previa' | 'camara_ip';
 
 export interface VideoSource {
   tipo: VideoSourceType;
@@ -63,18 +63,6 @@ export interface DetectionBox {
 }
 
 export type NivelAglomeracion = 'sin_aglomeracion' | 'bajo' | 'medio' | 'alto';
-
-export interface FrameAnalysisResult {
-  sesion_id: number;
-  personas: number;
-  nivel: NivelAglomeracion;
-  alerta: boolean;
-  detecciones: DetectionBox[];
-  personas_maximas: number;
-  nivel_maximo: NivelAglomeracion;
-  tiempo_primera_media_seg: number | null;
-  alerta_activada: boolean;
-}
 
 export interface AnalysisResult {
   id: number;

@@ -1,4 +1,4 @@
-import type { AnalysisResult, FrameAnalysisResult, VideoSSEEvent, ZonaCritica } from '../types/api';
+import type { AnalysisResult, VideoSSEEvent, ZonaCritica } from '../types/api';
 import { apiFetch } from './apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
@@ -6,18 +6,6 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 interface HistorialResponse {
   resultados: AnalysisResult[];
 }
-
-export const analyzeFrame = (
-  sesionId: number,
-  frameBlob: Blob,
-  zonaConfigId?: number | null,
-): Promise<FrameAnalysisResult> => {
-  const form = new FormData();
-  form.append('sesion_id', String(sesionId));
-  form.append('frame', frameBlob, 'frame.jpg');
-  if (zonaConfigId != null) form.append('zona_config_id', String(zonaConfigId));
-  return apiFetch('/api/analisis/frame', { method: 'POST', body: form });
-};
 
 export const getHistorial = async (): Promise<AnalysisResult[]> => {
   const data = await apiFetch<HistorialResponse>('/api/analisis/historial');
