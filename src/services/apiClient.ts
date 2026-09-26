@@ -1,5 +1,15 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('token');
   const isFormData = options.body instanceof FormData;
@@ -17,11 +27,11 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
     window.location.href = '/login';
-    throw new Error('UNAUTHORIZED');
+    throw new ApiError('UNAUTHORIZED', 401);
   }
 
   if (res.status === 403) {
-    throw new Error('No tienes permisos para realizar esta acción.');
+    throw new ApiError('No tienes permisos para realizar esta acción.', 403);
   }
 
   if (!res.ok) {
@@ -30,7 +40,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       const body = await res.json() as { detail?: string };
       if (body.detail) detail = body.detail;
     } catch { /* keep default */ }
-    throw new Error(detail);
+    throw new ApiError(detail, res.status);
   }
 
   if (res.status === 204) return undefined as T;

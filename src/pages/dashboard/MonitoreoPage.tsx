@@ -12,6 +12,7 @@ import type { ExclusionRect, ExclusionZoneConfig } from '../../types/zones';
 import { getVideoSources, selectVideoSource } from '../../services/videoSourceService';
 import { getRecordings, uploadRecording, deleteRecording } from '../../services/recordingService';
 import { startMonitoring, stopMonitoring } from '../../services/monitoringService';
+import { ApiError } from '../../services/apiClient';
 import { getExclusionZones } from '../../services/exclusionZoneService';
 import { streamVideoAnalisis } from '../../services/analisisService';
 
@@ -376,7 +377,15 @@ export default function MonitoreoPage() {
       setSession(s);
       setStep('stopped');
       flash('Monitoreo detenido.');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Error al detener monitoreo.'); }
+    } catch (e) {
+      // Cámara compartida iniciada por otro usuario: el backend no deja detenerla, solo se sale de la vista.
+      if (e instanceof ApiError && e.status === 403 && session.tipo_fuente === 'camara_ip') {
+        handleReset();
+        flash('Saliste de la vista. Solo quien inició el monitoreo de esta cámara o un administrador puede detenerlo.');
+        return;
+      }
+      setError(e instanceof Error ? e.message : 'Error al detener monitoreo.');
+    }
     finally { setStopping(false); }
   }
 
