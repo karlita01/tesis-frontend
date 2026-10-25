@@ -13,6 +13,7 @@ import { getRecordings, uploadRecording, deleteRecording } from '../../services/
 import { startMonitoring, stopMonitoring } from '../../services/monitoringService';
 import { getExclusionZones } from '../../services/exclusionZoneService';
 import { streamVideoAnalisis } from '../../services/analisisService';
+import { urlArchivoGrabacion } from '../../services/mediaService';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -323,9 +324,12 @@ export default function MonitoreoPage() {
 
     // Arrancar el video en el player y el RAF para las cajas
     if (videoAnalysisRef.current && selectedRecordingId != null) {
-      const token = localStorage.getItem('token') ?? '';
-      videoAnalysisRef.current.src = `${API_URL}/api/grabaciones/${selectedRecordingId}/file?token=${encodeURIComponent(token)}`;
-      videoAnalysisRef.current.play().catch(() => null);
+      // El <video> no puede mandar el header Authorization: la URL lleva un
+      // ticket válido solo para esta grabación, no el JWT de sesión.
+      const player = videoAnalysisRef.current;
+      urlArchivoGrabacion(selectedRecordingId)
+        .then((url) => { player.src = url; player.play().catch(() => null); })
+        .catch(() => setError('No se pudo cargar el video de la grabación.'));
       startVideoRAF();
     }
 

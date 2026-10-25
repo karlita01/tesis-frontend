@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { CameraIP, NivelAglomeracion } from '../../types/api';
 import { getCameras } from '../../services/cameraService';
 import { startMonitoring } from '../../services/monitoringService';
+import { urlMjpegCamara } from '../../services/mediaService';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -110,6 +111,7 @@ function CameraTile({ camera, onHide }: { camera: CameraIP; onHide: () => void }
   const [retryKey, setRetryKey] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [stats, setStats] = useState<{ personas: number; nivel: NivelAglomeracion; alerta: boolean } | null>(null);
+  const [mjpegSrc, setMjpegSrc] = useState<{ key: number; url: string } | null>(null);
 
   const sessionIdRef = useRef<number | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -257,6 +259,20 @@ function CameraTile({ camera, onHide }: { camera: CameraIP; onHide: () => void }
     }
   }
 
+  // El <img> no puede mandar el header Authorization: en cada (re)conexión se
+  // pide un ticket que vale solo para esta sesión y por un minuto, en vez de
+  // poner el JWT de sesión en la URL.
+  useEffect(() => {
+    const sessionId = sessionIdRef.current;
+    if (sessionId == null) return;
+    let cancelado = false;
+    urlMjpegCamara(sessionId, retryKey)
+      .then((url) => { if (!cancelado) setMjpegSrc({ key: retryKey, url }); })
+      .catch(() => { if (!cancelado) scheduleRetry(); });
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryKey]);
+
   function handleImgLoad() {
     setStatus('live');
     setAttempt(0);
@@ -268,8 +284,7 @@ function CameraTile({ camera, onHide }: { camera: CameraIP; onHide: () => void }
   }
 
   const sessionId = sessionIdRef.current;
-  const token = localStorage.getItem('token') ?? '';
-  const showImg = sessionId != null && (status === 'starting' || status === 'live');
+  const showImg = sessionId != null && mjpegSrc?.key === retryKey && (status === 'starting' || status === 'live');
 
   return (
     <div className="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden flex flex-col">
@@ -301,7 +316,7 @@ function CameraTile({ camera, onHide }: { camera: CameraIP; onHide: () => void }
         {showImg && (
           <img
             key={retryKey}
-            src={`${API_URL}/api/analisis/camara/${sessionId}/mjpeg?token=${encodeURIComponent(token)}&r=${retryKey}`}
+            src={mjpegSrc.url}
             alt={camera.nombre}
             className="w-full h-full object-contain"
             onLoad={handleImgLoad}

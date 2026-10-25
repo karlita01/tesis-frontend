@@ -2,8 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Alerta } from '../../types/api';
 import { getAlertas } from '../../services/alertaService';
 import { useAlerts } from '../../context/AlertContext';
+import { useEvidencia } from '../../services/mediaService';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// El clip se pide con la sesión iniciada y cada vista queda en la auditoría.
+function ClipEvidencia({ path }: { path: string }) {
+  const { url, error } = useEvidencia(path);
+  if (error) return <p className="mt-3 text-xs text-slate-500">{error}</p>;
+  if (!url) return <p className="mt-3 text-xs text-slate-400">Cargando clip…</p>;
+  return (
+    <video
+      className="mt-3 rounded-lg border border-slate-200 max-w-sm w-full"
+      src={url}
+      controls
+      autoPlay
+      muted
+    />
+  );
+}
 
 function formatDate(s: string | null): string {
   if (!s) return '—';
@@ -179,15 +194,7 @@ function AlertRow({
             </button>
           )}
         </div>
-        {verClip && alerta.clip_evidencia && (
-          <video
-            className="mt-3 rounded-lg border border-slate-200 max-w-sm w-full"
-            src={`${API_URL}/${alerta.clip_evidencia}`}
-            controls
-            autoPlay
-            muted
-          />
-        )}
+        {verClip && alerta.clip_evidencia && <ClipEvidencia path={alerta.clip_evidencia} />}
       </div>
 
       <div className="shrink-0">

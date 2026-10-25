@@ -20,6 +20,7 @@ import HistorialPage from './pages/dashboard/HistorialPage';
 import AlertasPage from './pages/dashboard/AlertasPage';
 import EstadoEdgePage from './pages/dashboard/EstadoEdgePage';
 import UsuariosPage from './pages/dashboard/UsuariosPage';
+import AuditoriaPage from './pages/dashboard/AuditoriaPage';
 
 function LandingPage() {
   return (
@@ -77,6 +78,14 @@ export default function App() {
                 element={
                   <ProtectedRoute requireAdmin>
                     <UsuariosPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="auditoria"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AuditoriaPage />
                   </ProtectedRoute>
                 }
               />

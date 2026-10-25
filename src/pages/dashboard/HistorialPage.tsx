@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import type { AnalysisResult, NivelAglomeracion, ZonaCritica } from '../../types/api';
 import { getHistorial, getZonasCriticas, deleteResultado } from '../../services/analisisService';
 import { useAuth } from '../../context/AuthContext';
-
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+import { useEvidencia } from '../../services/mediaService';
 
 const NIVEL_LABELS: Record<NivelAglomeracion, string> = {
   sin_aglomeracion: 'Sin aglomeración',
@@ -31,6 +30,23 @@ function formatDuration(inicio: string | null, fin: string | null): string {
   const secs = Math.round((new Date(fin).getTime() - new Date(inicio).getTime()) / 1000);
   if (secs < 60) return `${secs}s`;
   return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
+
+// La foto se pide con la sesión iniciada (ya no es un archivo público).
+// Si el archivo está en el equipo del local y no en este servidor, no se muestra.
+function MiniaturaEvidencia({ path, onAbrir }: { path: string; onAbrir: (url: string) => void }) {
+  const { url } = useEvidencia(path);
+  if (!url) return null;
+  return (
+    <button
+      onClick={() => onAbrir(url)}
+      className="shrink-0 w-20 h-14 rounded-lg overflow-hidden border border-slate-200
+                 hover:border-[#2563EB] transition-colors focus:outline-none focus-visible:ring-2"
+      title="Ver frame de mayor concentración"
+    >
+      <img src={url} alt="Evidencia" className="w-full h-full object-cover" />
+    </button>
+  );
 }
 
 // ── Vista: Sesiones ───────────────────────────────────────────────────────────
@@ -96,28 +112,13 @@ function SessionList({
 
       <div className="flex flex-col gap-3">
         {resultados.map((r) => {
-          const evidenciaUrl = r.frame_evidencia
-            ? `${API_URL}/${r.frame_evidencia}`
-            : null;
-
           return (
             <div key={r.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
               <div className="flex items-start gap-4 flex-wrap">
 
                 {/* Evidencia — thumbnail */}
-                {evidenciaUrl && (
-                  <button
-                    onClick={() => setLightbox(evidenciaUrl)}
-                    className="shrink-0 w-20 h-14 rounded-lg overflow-hidden border border-slate-200
-                               hover:border-[#2563EB] transition-colors focus:outline-none focus-visible:ring-2"
-                    title="Ver frame de mayor concentración"
-                  >
-                    <img
-                      src={evidenciaUrl}
-                      alt="Evidencia"
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
+                {r.frame_evidencia && (
+                  <MiniaturaEvidencia path={r.frame_evidencia} onAbrir={setLightbox} />
                 )}
 
                 {/* Info principal */}
